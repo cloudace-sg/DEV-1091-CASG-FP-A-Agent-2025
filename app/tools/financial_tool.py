@@ -1,5 +1,5 @@
 # app/tools/financial_tool.py
-
+#ss
 from google.cloud import bigquery
 from datetime import datetime, timedelta
 import os
