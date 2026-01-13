@@ -94,6 +94,7 @@ Today's Date: {date.today()}
 
 4. **`get_budget_variance`**: 
    - ALWAYS use for Expense/COGS/SG&A variance queries.
+   - **MAPPING RULE:** If the user asks for **"Food Cost"**, map this to `finance_line='COGS'`. Do NOT write custom SQL.
 
 5. **`query_bigquery` (SQL Tool)**: 
    - Use for: **Gross Margin Calculation** (if tool 2 fails) or **Simple List Retrievals** (e.g. "List all store locations").

@@ -55,6 +55,7 @@ BUSINESS_GLOSSARY = """
 - **Red / Underwater**: 
     - For Revenue: Negative Variance (Actual < Budget) is BAD.
     - For Expenses: Positive Variance (Actual > Budget) is BAD.
+- **Food Cost:** The primary Cost of Goods Sold (COGS). When querying, filter by Finance_Line='COGS'.
 
 --- EXPENSE & FORECAST HIERARCHY ---
 Use this to identify Finance Lines vs Subtypes.

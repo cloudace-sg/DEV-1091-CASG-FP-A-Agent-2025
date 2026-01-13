@@ -77,10 +77,11 @@ def analyze_variance_drivers(
         output = [f"**Variance Analysis ({dimension})**"]
         for row in results:
             variance = row.Variance or 0.0
+            actual = row.Actual or 0.0
             # For Expenses: Positive Variance = Bad (Over Budget)
             status = "Over Budget" if variance > 0 else "Under Budget"
             name = getattr(row, dimension, "Unknown")
-            output.append(f"- **{name}**: {status} by ${abs(variance):,.0f}")
+            output.append(f"- **{name}**: {status} by ${abs(variance):,.0f} (Actual: ${actual:,.0f})")
 
         # --- instructions to stop looping ---
         if dimension == 'Location':
@@ -146,7 +147,7 @@ def _analyze_revenue_drivers(current_month: str, location_filter: str, dimension
         for row in results:
             delta = row.Curr - row.Prev
             direction = "Increased" if delta > 0 else "Decreased"
-            output.append(f"- **{row.Name}**: {direction} by ${abs(delta):,.0f}")
+            output.append(f"- **{row.Name}**: {direction} by ${abs(delta):,.0f} (Current: ${row.Curr:,.0f})")
 
         return "\n".join(output)
     except Exception as e:
@@ -217,7 +218,7 @@ def scan_business_health(month: str) -> str:
     and 'Top Performers' (Under Budget) for the given month.
     """
     sql = f"""
-        SELECT Location, SUM(Variance_Amount) as Variance
+        SELECT Location, SUM(Actual_Amount) as Actual, SUM(Variance_Amount) as Variance
         FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail`
         WHERE Month = '{month}'
         GROUP BY Location
@@ -252,8 +253,9 @@ def scan_business_health(month: str) -> str:
         report.append("🚩 **Risk Areas (Over Budget):**")
         for row in risks:
             var = row.Variance or 0.0
+            act = row.Actual or 0.0
             if var > 0:
-                report.append(f"- **{row.Location}**: Over by ${var:,.0f}")
+                report.append(f"- **{row.Location}**: Over by ${var:,.0f} (Total Spend: ${act:,.0f})")
             else:
                 report.append("- (None detected)")
             

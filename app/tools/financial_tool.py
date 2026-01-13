@@ -48,14 +48,13 @@ def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_star
         # ------------------------------
 
         try:
-            # Explicitly pass location to BQ dataset
             job = client.query(sql, location=LOCATION)
             result = job.result()
             for row in result:
-                return row.val or 0.0
+                # FIX: Force conversion to float to match the default 0.0
+                return float(row.val or 0.0) 
             return 0.0
         except Exception as e:
-            # This print will show up in terminal logs if it fails
             print(f"[TOOL ERROR] Query Failed: {e}") 
             return 0.0
 
@@ -169,54 +168,63 @@ def get_revenue_variance(start_date: str, end_date: str) -> str:
         f"*System Note: The 'Forecast' table tracks Expenses only. Revenue targets are not currently loaded.*"
     )
 
-def get_budget_variance(month: str, finance_line: str = None) -> str:
+def get_budget_variance(month: str, finance_line: str = None, subtype: str = None) -> str:
     """
-    Retrieves Budget vs Actual variance for a specific Expense Line (COGS, SG&A, etc.)
-    or the whole company for a given month.
-    
-    Args:
-        month (str): YYYY-MM-DD
-        finance_line (str): Optional (e.g., 'COGS', 'SG&A'). If None, returns total expense variance.
+    Retrieves Budget vs Actual variance. Can filter by Finance Line OR specific Subtype.
     """
     
-    # 1. Handle Revenue (Redirect)
+    # 1. Handle Revenue Redirect
     if finance_line and finance_line.lower() in ['revenue', 'sales']:
         return "Error: For Revenue, use the `get_revenue_variance` tool."
 
-    # 2. Build SQL for Expenses
-    filter_sql = f"AND Finance_Line = '{finance_line}'" if finance_line else ""
+    # 2. Build Query Conditions
+    conditions = [f"Month = '{month}'"]
     
+    if finance_line:
+        conditions.append(f"Finance_Line = '{finance_line}'")
+    
+    # --- NEW: Support Subtype filtering ---
+    if subtype:
+        # Lowercase match to be safe
+        conditions.append(f"LOWER(Subtype) = '{subtype.lower()}'")
+    
+    where_clause = " AND ".join(conditions)
+    
+    # 3. Dynamic SQL
     sql = f"""
         SELECT 
             SUM(Actual_Amount) as Actual, 
             SUM(Forecast_Amount) as Budget,
             SUM(Variance_Amount) as Variance
         FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail`
-        WHERE Month = '{month}'
-        {filter_sql}
+        WHERE {where_clause}
     """
     
-    # --- DEBUG PRINT ---
+    # Debug Print
     print(f"\n[DEBUG] get_budget_variance SQL:\n{sql}\n")
-    # -------------------
 
     try:
         query_job = client.query(sql)
-        row = next(query_job.result())
+        # Handle empty results (e.g. if subtype is misspelled)
+        results = list(query_job.result())
+        if not results:
+            return f"No data found for {subtype or finance_line} in {month}."
+            
+        row = results[0]
         
         if row.Actual is None:
-            return f"No data found for {finance_line or 'Total Expenses'} in {month}."
+            return f"No data found for {subtype or finance_line} in {month}."
 
         act = row.Actual or 0.0
         bud = row.Budget or 0.0
         var = row.Variance or 0.0
         
-        # Format the output
+        # 4. Standardized Formatting
         status = "Unfavorable (Over Budget)" if var > 0 else "Favorable (Under Budget)"
         
         return (
             f"**Budget Variance Report ({month})**\n"
-            f"- **Category**: {finance_line or 'Total Expenses'}\n"
+            f"- **Item**: {subtype or finance_line or 'Total Expenses'}\n"
             f"- **Actual**: ${act:,.2f}\n"
             f"- **Budget**: ${bud:,.2f}\n"
             f"- **Variance**: ${abs(var):,.2f} {status}"
