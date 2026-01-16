@@ -3,3 +3,9 @@ google-cloud-bigquery
 google-adk
 langchain-core
 pandas
+streamlit
+requests
+uvicorn
+fastapi
+pydantic
+    
