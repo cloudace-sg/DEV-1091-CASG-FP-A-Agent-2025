@@ -1,7 +1,7 @@
 # app/sub_agents/metrics/prompts.py
 
 from datetime import date
-from app.constants import SCHEMA_INFO, BUSINESS_GLOSSARY, METRICS_SQL_LOGIC
+from app.constants import SCHEMA_INFO, BUSINESS_GLOSSARY, METRICS_SQL_LOGIC, STREAMLIT_FORMATTING_INSTRUCTIONS
 
 # ==============================================================================
 # 2. FEW-SHOT EXAMPLES (MIXED TOOLS STRATEGY)
@@ -165,4 +165,7 @@ Today's Date: {date.today()}
 
 # EXAMPLES (Study how to choose between Tools)
 {SQL_EXAMPLES}
+
+# Currency formatting
+{STREAMLIT_FORMATTING_INSTRUCTIONS}
 """

@@ -76,3 +76,17 @@ METRICS_SQL_LOGIC = """
 - **Gross Margin**: There is no 'Gross_Margin' column. You MUST calculate it as: `(Revenue - Cost)`.
 - **Month-over-Month (MoM)**: When writing SQL, use `LAG()` window functions to compare rows.
 """
+
+# ==============================================================================
+# 3. STREAMLIT FORMATTING (Currency)
+# ==============================================================================
+STREAMLIT_FORMATTING_INSTRUCTIONS = """
+### TECHNICAL FORMATTING RULES (CRITICAL):
+1. **DO NOT** use LaTeX formatting (no $...$ or $$...$$).
+2. When formatting currency, **ALWAYS escape the dollar sign** by putting a backslash before it.
+   - WRONG: $10,000
+   - WRONG: $ 10,000
+   - CORRECT: \$10,000
+3. Alternatively, use "SGD" instead of a symbol (e.g., "10,000 SGD").
+4. Never wrap sentences or text in dollar signs.
+"""

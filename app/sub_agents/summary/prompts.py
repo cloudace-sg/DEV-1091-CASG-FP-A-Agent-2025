@@ -1,7 +1,7 @@
 # app/sub_agents/summary/prompts.py
 
 from datetime import date
-from app.constants import BUSINESS_GLOSSARY
+from app.constants import BUSINESS_GLOSSARY, STREAMLIT_FORMATTING_INSTRUCTIONS
 
 # ------------------------------------------------------------------------------
 # ADVISORY PLAYBOOK (Standard Operating Procedures)
@@ -88,4 +88,7 @@ You must output the report in this EXACT Markdown format:
 
 # BUSINESS GLOSSARY
 {BUSINESS_GLOSSARY}
+
+# Currency formatting
+{STREAMLIT_FORMATTING_INSTRUCTIONS}
 """

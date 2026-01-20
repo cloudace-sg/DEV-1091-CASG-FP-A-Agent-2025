@@ -1,7 +1,7 @@
 # app/sub_agents/investigation/prompts.py
 
 from datetime import date
-from app.constants import SCHEMA_INFO, BUSINESS_GLOSSARY
+from app.constants import SCHEMA_INFO, BUSINESS_GLOSSARY, STREAMLIT_FORMATTING_INSTRUCTIONS
 
 # ==============================================================================
 # 2. FEW-SHOT EXAMPLES (INVESTIGATION STRATEGY)
@@ -199,4 +199,7 @@ When the investigation is complete:
 
 # EXAMPLES (Study the Drill-Down Logic)
 {INVESTIGATION_EXAMPLES}
+
+# Currency formatting
+{STREAMLIT_FORMATTING_INSTRUCTIONS}
 """
