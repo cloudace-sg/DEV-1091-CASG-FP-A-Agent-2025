@@ -7,7 +7,8 @@ from app.tools.financial_tool import (
     get_pnl_comparison,
     analyze_gross_margin,
     get_revenue_variance,
-    get_budget_variance
+    get_budget_variance,
+    get_chart_data
 )
 from .prompts import METRICS_AGENT_PROMPT
 
@@ -20,7 +21,8 @@ metrics_agent = LlmAgent(
         get_pnl_comparison,
         analyze_gross_margin,
         get_revenue_variance,
-        get_budget_variance
+        get_budget_variance,
+        get_chart_data
     ],
     model="gemini-2.5-flash"
 )

@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 import uuid
 import json
+import re
+import pandas as pd
+import plotly.express as px
 
 # ==============================================================================
 # 1. CONFIGURATION & PASSWORD
@@ -49,13 +52,63 @@ def recursive_find_text(data):
     return None
 
 def clean_formatting(text):
-    """Removes backticks to fix the font issue."""
+    """Removes backticks and handles LaTeX formatting issues."""
     if isinstance(text, str):
+        # Fix the "Math Font" issue by escaping dollar signs if not already escaped
+        text = text.replace("$", "\$").replace("\\\$", "\$") 
         return text.replace("`", "")
     return text
 
 # ==============================================================================
-# 3. SESSION STATE
+# 3. VISUALIZATION ENGINE (The New Part)
+# ==============================================================================
+# ... inside frontend.py ...
+
+def render_smart_response(text):
+    """
+    Parses MULTIPLE <<<CHART_DATA: type | {data} >>> tags.
+    """
+    pattern = r"<<<CHART_DATA: (.*?) \| (.*?) >>>"
+    
+    parts = re.split(pattern, text, flags=re.DOTALL)
+    
+    # Iterate in steps of 3 (Text, Type, JSON)
+    for i in range(0, len(parts), 3):
+        
+        # 1. Render Text
+        if parts[i].strip():
+            st.markdown(parts[i])
+            
+        # 2. Render Chart (if present)
+        if i + 2 < len(parts):
+            chart_type = parts[i+1].strip()
+            raw_json = parts[i+2].strip()
+            
+            clean_json = raw_json.replace("```json", "").replace("```", "").replace('\\"', '"')
+
+            try:
+                data = json.loads(clean_json)
+                df = pd.DataFrame(data)
+                
+                if "breakdown" in chart_type:
+                    fig = px.pie(df, names="label", values="value", title=f"Breakdown Analysis", hole=0.4)
+                elif "budget" in chart_type or "compare" in chart_type:
+                    fig = px.bar(df, x="label", y=["actual", "budget"], barmode='group', title="Budget vs Actual")
+                else:
+                    fig = px.line(df, x="label", y="value", title="Trend Analysis", markers=True)
+                
+                # --- CRITICAL FIX: UNIQUE KEY ---
+                # This prevents the "duplicate element" crash
+                unique_key = f"chart_{i}_{str(uuid.uuid4())[:8]}"
+                
+                # UPDATED: Use standard Streamlit parameter
+                st.plotly_chart(fig, use_container_width=True, key=unique_key)
+                
+            except Exception as e:
+                st.error(f"Chart Error: {str(e)}")
+
+# ==============================================================================
+# 4. SESSION STATE SETUP
 # ==============================================================================
 if "session_id" not in st.session_state:
     new_id = str(uuid.uuid4())
@@ -70,25 +123,31 @@ if "messages" not in st.session_state:
     })
 
 # ==============================================================================
-# 4. MAIN INTERFACE
+# 5. MAIN INTERFACE
 # ==============================================================================
 with st.sidebar:
+    st.markdown("### 🤖 Agent Status")
+    st.success("System Online")
     if st.button("New Session"):
         st.session_state.messages = []
         del st.session_state.session_id
         st.rerun()
 
-# --- DISPLAY HISTORY (This is the ONLY place messages are printed) ---
+# --- DISPLAY HISTORY (UPDATED LOOP) ---
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
-        st.write(msg["content"])
+        # USE THE NEW RENDERER HERE
+        if msg["role"] == "assistant":
+            render_smart_response(msg["content"])
+        else:
+            st.write(msg["content"])
 
 # --- HANDLE INPUT ---
 if user_input := st.chat_input("Ask a financial question..."):
     # 1. Add User Message to State
     st.session_state.messages.append({"role": "user", "content": user_input})
     
-    # 2. Get AI Response (Visual Spinner only, no printing yet)
+    # 2. Get AI Response
     with st.spinner("Analyzing..."):
         try:
             run_url = f"{BASE_URL}/run"
@@ -109,12 +168,12 @@ if user_input := st.chat_input("Ask a financial question..."):
                 answer = recursive_find_text(data)
                 
                 # Fallback
-                if not answer: answer = data
+                if not answer: answer = "I processed the request but received no text output."
 
-                # === CLEANUP (Fixes the font) ===
+                # Clean formatting
                 final_answer = clean_formatting(answer)
 
-                # 3. Add AI Message to State (ONLY ONCE)
+                # 3. Add AI Message to State
                 st.session_state.messages.append({"role": "assistant", "content": final_answer})
                 
             else:
@@ -123,5 +182,5 @@ if user_input := st.chat_input("Ask a financial question..."):
         except Exception as e:
             st.error(f"System Error: {str(e)}")
 
-    # 4. FORCE RELOAD (Fixes the duplicate bug)
+    # 4. Force Reload to show the new message via the render loop
     st.rerun()

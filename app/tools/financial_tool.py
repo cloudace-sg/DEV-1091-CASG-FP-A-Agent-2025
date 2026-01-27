@@ -3,6 +3,9 @@
 from google.cloud import bigquery
 from datetime import datetime, timedelta
 import os
+import streamlit as st
+import json 
+
 
 # --- CONFIGURATION ---
 PROJECT_ID = "strong-kit-475107-k1"
@@ -232,3 +235,185 @@ def get_budget_variance(month: str, finance_line: str = None, subtype: str = Non
 
     except Exception as e:
         return f"Error calculating variance: {str(e)}"
+
+def parse_period_simple(period_str):
+    """
+    Robust Date Parser.
+    - '2025' -> '2025' (Yearly search)
+    - 'Nov 2025', 'November 2025' -> '2025-11' (Monthly search)
+    - None -> '2025-11' (Default fallback)
+    """
+    if not period_str: return "2025-11"
+    
+    clean_str = period_str.lower().strip()
+    
+    # 1. Handle Full Year ("2025")
+    if clean_str.isdigit() and len(clean_str) == 4:
+        return clean_str
+        
+    # 2. Handle YYYY-MM
+    if "-" in clean_str and clean_str[:4].isdigit(): 
+        return clean_str[:7]
+
+    # 3. Handle Text Months ("Nov 2025")
+    months = {"jan": "01", "feb": "02", "mar": "03", "apr": "04", "may": "05", "jun": "06",
+              "jul": "07", "aug": "08", "sep": "09", "oct": "10", "nov": "11", "dec": "12"}
+    
+    for mon, num in months.items():
+        if mon in clean_str:
+            year = "".join(filter(str.isdigit, clean_str))
+            if len(year) == 4: return f"{year}-{num}"
+            
+    return "2025-11" # Default fallback
+
+def get_chart_data(metric_name: str, chart_type: str = "trend", period: str = None, dimension: str = None, filter_location: str = None, granularity: str = "monthly") -> str:
+    
+    # --- 1. SETUP ---
+    clean_period = parse_period_simple(period)
+    raw_metric = metric_name.lower().strip()
+    
+    # --- 2. SMART MAPPING (Keyword Search) ---
+    # We look for these keywords INSIDE the user's string.
+    mapping = {
+        # Daily Metrics
+        "transaction": "Transaction_Count", 
+        "ticket": "Avg_Ticket_Size",
+        "items sold": "Items_Sold",
+        "quantity": "Quantity_Sold",
+        
+        # Monthly Metrics
+        "revenue": "Total_Revenue", "sales": "Total_Revenue",
+        "food cost": "COGS", "cogs": "COGS", "product cost": "COGS",
+        "labor": "SG&A", "payroll": "SG&A",
+        "opex": "OPEX", "operating expenses": "OPEX",
+        "net profit": "Net_Profit", "profit": "Net_Profit",
+        
+        # [CRITICAL FIX] HIERARCHY MAPPING
+        # These allow the tool to recognize them as Finance Lines, not Products
+        "sg&a": "SG&A", "sga": "SG&A",
+        "overheads": "Overheads", "utilities": "Overheads", "rental": "Overheads",
+        "facilities": "Facilities", "maintenance": "Facilities", "renovation": "Facilities",
+        "advertising": "Advertising", "print advertising": "Advertising",
+        "assets": "Assets", "kitchen tools": "Assets"
+    }
+    
+    # Find the first matching keyword in the user string
+    found_key = next((k for k in mapping if k in raw_metric), None)
+    db_metric = mapping[found_key] if found_key else raw_metric
+    
+    # --- 3. AUTO-ROUTING LOGIC ---
+    
+    # List of metrics that ONLY exist in the Daily Table
+    daily_only_metrics = ["Transaction_Count", "Items_Sold", "Avg_Ticket_Size", "Total_Discounts"]
+    # List of metrics that exist in BOTH (Revenue)
+    hybrid_metrics = ["Total_Revenue"]
+
+    # FORCE DAILY: If it's a daily-only metric (like Transactions), force Daily mode.
+    if db_metric in daily_only_metrics:
+        granularity = "daily"
+
+    # DETECT PRODUCT: If we didn't find a map key, AND it's not a known metric -> It's a Product.
+    is_product = (not found_key) and (db_metric not in daily_only_metrics) and (db_metric not in hybrid_metrics)
+    
+    # === ROUTE A: PRODUCT ANALYSIS ===
+    if is_product or "product" in raw_metric:
+        # Clean Search Term: "Daily Sales of Big Mac" -> "Big Mac"
+        search_term = raw_metric.replace("daily", "").replace("sales", "").replace("trend", "").replace("of", "").replace("visualize", "").strip()
+
+        if granularity == "daily":
+            table_name = "POS"
+            date_col = "DATE(timestamp)" 
+            value_col = "quantity" if "quantity" in raw_metric else "subtotal" 
+            
+            # LIKE '{clean_period}%' allows '2025%' to match '2025-11-01'
+            where_clause = f"WHERE 1=1 AND CAST(DATE(timestamp) AS STRING) LIKE '{clean_period}%'"
+            if filter_location: where_clause += f" AND LOWER(location) = '{filter_location.lower()}'"
+            
+            if "product" not in search_term and "mix" not in search_term:
+                 where_clause += f" AND LOWER(product_description) LIKE '%{search_term}%'"
+            
+            query = f"""
+                SELECT CAST({date_col} AS STRING) as label, SUM({value_col}) as value
+                FROM `{PROJECT_ID}.fpaa_dataset.{table_name}`
+                {where_clause}
+                GROUP BY 1 ORDER BY 1 ASC
+            """
+            chart_tag = "trend"
+
+        else: # Monthly Product
+            table_name = "Product_Mix_Analysis"
+            value_col = "Quantity_Sold" if "quantity" in raw_metric else "Revenue_Generated"
+            where_clause = f"WHERE CAST(Month AS STRING) LIKE '{clean_period}%'"
+            if filter_location: where_clause += f" AND LOWER(Location) = '{filter_location.lower()}'"
+            
+            if "product" not in search_term and "mix" not in search_term:
+                where_clause += f" AND LOWER(product_description) LIKE '%{search_term}%'"
+                query = f"SELECT CAST(Month AS STRING) as label, SUM({value_col}) as value FROM `{PROJECT_ID}.fpaa_dataset.{table_name}` {where_clause} GROUP BY 1 ORDER BY 1"
+                chart_tag = "trend"
+            else:
+                query = f"SELECT product_description as label, SUM({value_col}) as value FROM `{PROJECT_ID}.fpaa_dataset.{table_name}` {where_clause} GROUP BY 1 ORDER BY 2 DESC LIMIT 10"
+                chart_tag = "breakdown"
+
+    # === ROUTE B: DAILY STORE METRICS ===
+    elif granularity == "daily":
+        table_name = "Daily_Sales_Performance"
+        date_col = "Sales_Date"
+        # Map generic 'Revenue' to 'Total_Revenue' if needed
+        metric_col = db_metric if db_metric in daily_only_metrics + hybrid_metrics else "Total_Revenue"
+
+        where_clause = f"WHERE 1=1 AND CAST(Sales_Date AS STRING) LIKE '{clean_period}%'"
+        if filter_location: where_clause += f" AND LOWER(Location) = '{filter_location.lower()}'"
+
+        query = f"SELECT CAST({date_col} AS STRING) as label, CAST(SUM({metric_col}) AS FLOAT64) as value FROM `{PROJECT_ID}.fpaa_dataset.{table_name}` {where_clause} GROUP BY 1 ORDER BY 1 ASC"
+        chart_tag = "trend"
+
+    # === ROUTE C: STANDARD FINANCIALS (Monthly P&L) ===
+    else:
+        # [CRITICAL FIX] Trend Context Logic
+        # If user asks for "Trend" of "Nov 2025", we must show the WHOLE YEAR (2025)
+        # Otherwise we get a single dot on the chart.
+        if chart_type == "trend":
+            trend_period = clean_period[:4] # Extract Year (e.g. "2025")
+            target_month_clause = f"AND CAST(Month AS STRING) LIKE '{trend_period}%'"
+        else:
+            # For Bar/Pie, stick to the specific month
+            target_month_clause = f"AND CAST(Month AS STRING) LIKE '{clean_period}%'"
+
+        loc_clause = f"AND LOWER(Location) = '{filter_location.lower()}'" if filter_location else ""
+
+        if chart_type == "breakdown":
+            if db_metric == "Total_Revenue":
+                 query = f"SELECT Location as label, SUM(Revenue) as value FROM `{PROJECT_ID}.fpaa_dataset.Master_PnL_Summary` WHERE 1=1 {target_month_clause} {loc_clause} GROUP BY 1 ORDER BY 2 DESC"
+            elif db_metric == "OPEX":
+                query = f"SELECT Finance_Line as label, SUM(Actual_Amount) as value FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail` WHERE LOWER(Finance_Line) NOT IN ('revenue', 'sales', 'cogs', 'food cost', 'labor') {target_month_clause} {loc_clause} GROUP BY 1 ORDER BY 2 DESC"
+            else:
+                group_col = "Location" if dimension == "location" else "Subtype"
+                # Use db_metric (SG&A) to filter by Finance_Line OR Subtype
+                query = f"SELECT {group_col} as label, SUM(Actual_Amount) as value FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail` WHERE (LOWER(Finance_Line) = '{db_metric.lower()}' OR LOWER(Subtype) = '{db_metric.lower()}') {target_month_clause} {loc_clause} GROUP BY 1 ORDER BY 2 DESC"
+            chart_tag = "breakdown"
+
+        elif chart_type == "budget_vs_actual":
+            query = f"SELECT FORMAT_DATE('%b %Y', Month) as label, SUM(Actual_Amount) as actual, SUM(Forecast_Amount) as budget FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail` WHERE (LOWER(Finance_Line) = '{db_metric.lower()}' OR LOWER(Subtype) = '{db_metric.lower()}') {target_month_clause} {loc_clause} GROUP BY Month ORDER BY Month ASC"
+            chart_tag = "budget_vs_actual"
+
+        else: # Trend
+             if not filter_location and db_metric in ["Total_Revenue", "Net_Profit", "OPEX"]:
+                 master_col_map = {"Total_Revenue": "Revenue", "Net_Profit": "Net_Profit", "OPEX": "OPEX_Variance"}
+                 master_col = master_col_map.get(db_metric, "Revenue")
+                 query = f"SELECT CAST(Month AS STRING) as label, CAST(SUM({master_col}) AS FLOAT64) as value FROM `{PROJECT_ID}.fpaa_dataset.Master_PnL_Summary` WHERE 1=1 {target_month_clause} GROUP BY 1 ORDER BY 1"
+             else:
+                query = f"SELECT CAST(Month AS STRING) as label, CAST(SUM(Actual_Amount) AS FLOAT64) as value FROM `{PROJECT_ID}.fpaa_dataset.Budget_Variance_Detail` WHERE (LOWER(Finance_Line) = '{db_metric.lower()}' OR LOWER(Subtype) = '{db_metric.lower()}') {loc_clause} {target_month_clause} GROUP BY 1 ORDER BY 1"
+             chart_tag = "trend"
+
+    # --- 4. EXECUTE ---
+    print(f"\n[DEBUG] Request: '{metric_name}' | DB_Metric: '{db_metric}' | Granularity: '{granularity}' | Period: '{clean_period}'")
+    
+    try:
+        df = client.query(query).to_dataframe()
+        if not df.empty:
+            json_data = df.to_json(orient='records')
+            return f"SUCCESS. You MUST output this EXACT tag: <<<CHART_DATA: {chart_tag} | {json_data} >>>"
+        else:
+            return f"WARNING: No data found for '{metric_name}' during '{clean_period}'. (DB Map: {db_metric})"
+    except Exception as e:
+        return f"Error fetching chart data: {str(e)}"
