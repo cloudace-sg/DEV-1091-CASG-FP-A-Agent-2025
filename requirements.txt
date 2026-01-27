@@ -1,4 +1,4 @@
-db-dtypes
+
 google-cloud-bigquery
 google-adk
 langchain-core
