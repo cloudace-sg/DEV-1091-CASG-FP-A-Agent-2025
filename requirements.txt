@@ -10,4 +10,7 @@ fastapi
 pydantic
 plotly>=5.0.0
 db-dtypes>=1.0.0
+google-auth
+requests
+
     

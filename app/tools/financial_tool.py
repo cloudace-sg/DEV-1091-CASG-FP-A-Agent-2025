@@ -3,7 +3,6 @@
 from google.cloud import bigquery
 from datetime import datetime, timedelta
 import os
-import streamlit as st
 import json 
 
 
@@ -241,7 +240,7 @@ def parse_period_simple(period_str):
     Robust Date Parser.
     - '2025' -> '2025' (Yearly search)
     - 'Nov 2025', 'November 2025' -> '2025-11' (Monthly search)
-    - None -> '2025-11' (Default fallback)
+    - None -> '2025' (Default fallback)
     """
     if not period_str: return "2025-11"
     
@@ -264,7 +263,7 @@ def parse_period_simple(period_str):
             year = "".join(filter(str.isdigit, clean_str))
             if len(year) == 4: return f"{year}-{num}"
             
-    return "2025-11" # Default fallback
+    return "2025" # Default fallback
 
 def get_chart_data(metric_name: str, chart_type: str = "trend", period: str = None, dimension: str = None, filter_location: str = None, granularity: str = "monthly") -> str:
     
@@ -284,7 +283,7 @@ def get_chart_data(metric_name: str, chart_type: str = "trend", period: str = No
         # Monthly Metrics
         "revenue": "Total_Revenue", "sales": "Total_Revenue",
         "food cost": "COGS", "cogs": "COGS", "product cost": "COGS",
-        "labor": "SG&A", "payroll": "SG&A",
+        "labor": "SG&A", "payroll": "SG&A", 
         "opex": "OPEX", "operating expenses": "OPEX",
         "net profit": "Net_Profit", "profit": "Net_Profit",
         
