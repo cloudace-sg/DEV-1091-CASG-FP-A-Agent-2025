@@ -14,6 +14,16 @@
 
 FROM python:3.11-slim
 
+# Install system-level dependencies for building pycairo and rendering PDFs
+RUN apt-get update && apt-get install -y \
+    gcc \
+    build-essential \
+    pkg-config \
+    libcairo2-dev \
+    fontconfig \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+    
 # Install uv
 RUN pip install --no-cache-dir uv==0.8.13
 

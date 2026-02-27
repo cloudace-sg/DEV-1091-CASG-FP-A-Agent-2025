@@ -6,20 +6,25 @@ authors = [
     {name = "Your Name", email = "your@email.com"},
 ]
 dependencies = [
-    "google-adk>=1.15.0,<2.0.0",
-    "opentelemetry-instrumentation-google-genai>=0.1.0,<1.0.0",
+    "google-adk[a2a]==1.20.0",
+    "google-cloud-aiplatform>=1.38.0",
+    "Deprecated>=1.2.14",
     "gcsfs>=2024.11.0",
     "google-cloud-logging>=3.12.0,<4.0.0",
-    "google-cloud-aiplatform[evaluation]>=1.118.0,<2.0.0",
-    "fastapi~=0.115.8",
     "uvicorn~=0.34.0",
     "asyncpg>=0.30.0,<1.0.0",
     "streamlit>=1.53.0",
     "requests>=2.32.5",
-    "plotly>=5.0.0",               
-    "google-cloud-bigquery>=3.0.0", 
-    "pandas>=2.0.0",               
-    "db-dtypes>=1.0.0"
+    "plotly>=5.0.0",
+    "google-cloud-bigquery>=3.0.0",
+    "pandas>=2.0.0",
+    "google-auth>=2.0.0",
+    "db-dtypes>=1.0.0",
+    "matplotlib>=3.10.8",
+    "seaborn>=0.13.2",
+    "markdown",
+    "xhtml2pdf",
+    "google-cloud-storage"
 ]
 requires-python = ">=3.10,<3.14"
 
@@ -96,7 +101,7 @@ pythonpath = "."
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.hatch.build.targets.wheel]
-packages = ["app","frontend"]
+packages = ["app"]
 
 [tool.agent-starter-pack]
 # Generation metadata - enables CLI commands to understand project context

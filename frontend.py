@@ -6,6 +6,11 @@ import re
 import pandas as pd
 import plotly.express as px
 
+# NEW for GE
+import os  
+import google.auth 
+from google.auth.transport.requests import Request as GoogleRequest 
+
 # ==============================================================================
 # 1. CONFIGURATION & PASSWORD
 # ==============================================================================
@@ -17,7 +22,8 @@ if password != "nadyabuiltthis2026":
     st.warning("🔒 Please enter the password to access the FP&A Agent.")
     st.stop()
 
-BASE_URL = "http://localhost:8000"
+# enables cloud run to inject URL via environment variables
+BASE_URL = os.environ.get("BACKEND_URL", "http://localhost:8000")
 APP_NAME = "app"
 USER_ID = "test-user@example.com"
 
@@ -27,8 +33,17 @@ USER_ID = "test-user@example.com"
 def create_session_if_needed(session_id):
     """Register session with backend."""
     url = f"{BASE_URL}/apps/{APP_NAME}/users/{USER_ID}/sessions/{session_id}"
+    
+    # --- NEW AUTH LOGIC ---
+    headers = {}
+    token = get_id_token(BASE_URL)
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    # ----------------------
+
     try:
-        requests.post(url, json={}, timeout=5)
+        # Pass headers here
+        requests.post(url, json={}, headers=headers, timeout=5)
     except Exception:
         pass
 
@@ -59,6 +74,19 @@ def clean_formatting(text):
         return text.replace("`", "")
     return text
 
+def get_id_token(url):
+    """Generates a secure ID token for the target Cloud Run URL."""
+    # If running locally against localhost, we don't need a token
+    if "localhost" in url:
+        return None
+        
+    try:
+        auth_req = GoogleRequest()
+        # This automatically grabs credentials from the Cloud Run service account
+        return google.auth.id_token.fetch_id_token(auth_req, url)
+    except Exception as e:
+        print(f"Warning: Could not fetch ID token: {e}")
+        return None
 # ==============================================================================
 # 3. VISUALIZATION ENGINE (The New Part)
 # ==============================================================================
@@ -151,6 +179,14 @@ if user_input := st.chat_input("Ask a financial question..."):
     with st.spinner("Analyzing..."):
         try:
             run_url = f"{BASE_URL}/run"
+
+            # --- START FIX: Define headers HERE ---
+            headers = {}
+            token = get_id_token(BASE_URL)
+            if token:
+                headers["Authorization"] = f"Bearer {token}"
+            # --- END FIX ---
+            
             payload = {
                 "app_name": APP_NAME,
                 "session_id": st.session_state.session_id,
@@ -160,8 +196,8 @@ if user_input := st.chat_input("Ask a financial question..."):
                     "parts": [{"text": user_input}] 
                 }
             }
-            
-            response = requests.post(run_url, json=payload, timeout=120)
+            # updated to include headers
+            response = requests.post(run_url, json=payload, headers=headers, timeout=120)
             
             if response.status_code == 200:
                 data = response.json()
