@@ -7,9 +7,9 @@ from app.tools.financial_tool import (
     get_pnl_comparison,
     analyze_gross_margin,
     get_revenue_variance,
-    get_budget_variance,
-    get_chart_data
+    get_budget_variance
 )
+from app.tools.visualization_tool import get_chart_data
 from .prompts import METRICS_AGENT_PROMPT
 
 # --- define call_metrics_agent
