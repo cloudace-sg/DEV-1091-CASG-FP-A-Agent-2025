@@ -88,7 +88,8 @@ async def gemini_translator(request: Request):
         except: pass 
 
         response = await loop.run_in_executor(None, lambda: requests.post(
-            f"{base_url}/run", json=adk_payload, timeout=30
+            # Increased timeout to 180 seconds to allow for complex BigQuery/Charting tasks
+            f"{base_url}/run", json=adk_payload, timeout=180
         ))
         
         # 3. USE SMART EXTRACTION

@@ -23,6 +23,9 @@ def export_to_pdf(report_markdown: str) -> str:
         return "ERROR: The provided report content is empty. Please ask the user to generate a full report first."
 
     try:
+        # --- NEW FIX: Unescape literal newlines from the JSON payload ---
+        report_markdown = report_markdown.replace('\\n', '\n')
+        
         report_markdown = re.sub(r'\\+\$', '$', report_markdown) 
         report_markdown = report_markdown.replace("\\'", "'")  
         report_markdown = report_markdown.replace('\\"', '"')
@@ -53,28 +56,42 @@ def export_to_pdf(report_markdown: str) -> str:
                 print(f"[DEBUG] Failed to embed image in PDF: {e}")
         # ================================
         '''
-        # === PRE-FETCH & EMBED IMAGES (BULLETPROOF BASE64) ===
-        def fetch_and_encode_image(match):
-            img_tag = match.group(0)
-            # Scrub HTML ampersands back to normal before downloading
-            img_url = match.group(1).replace("&amp;", "&") 
-            try:
-                # Force Python to download the image natively
-                response = requests.get(img_url, timeout=10)
-                if response.status_code == 200:
-                    img_base64 = base64.b64encode(response.content).decode('utf-8')
-                    # Inject the raw image data directly into the HTML tag
-                    return img_tag.replace(match.group(1), f"data:image/png;base64,{img_base64}")
-                else:
-                    print(f"[DEBUG] Google blocked the image download. Status: {response.status_code}")
-            except Exception as e:
-                print(f"[DEBUG] Base64 Image Error: {str(e)}")
-            
-            return img_tag # Fallback to original if it fails
+        # 1. Convert Markdown to HTML
+        html_body = markdown.markdown(report_markdown, extensions=['tables', 'fenced_code'])
 
-        # Find all <img> tags and replace their URLs with baked-in Base64 data
-        html_body = re.sub(r'<img[^>]+src="([^">]+)"', fetch_and_encode_image, html_body)
-        # =====================================================
+        # === PRE-FETCH & EMBED IMAGES FROM HYPERLINKS (MAGIC PDF FIX) ===
+        def fetch_link_and_convert_to_image(match):
+            original_text = match.group(0)
+            
+            # Extract the URL and fix ampersands
+            img_url = match.group(1).replace("&amp;", "&") 
+            
+            if "storage.googleapis.com" in img_url:
+                try:
+                    # Force Python to download the image
+                    response = requests.get(img_url, timeout=10)
+                    if response.status_code == 200:
+                        img_base64 = base64.b64encode(response.content).decode('utf-8')
+                        # MAGIC: Return ONLY the image. The "Click here..." text is safely destroyed!
+                        return f'<br><img src="data:image/png;base64,{img_base64}"><br>'
+                    else:
+                        print(f"[DEBUG] Google blocked the image download. Status: {response.status_code}")
+                except Exception as e:
+                    print(f"[DEBUG] Base64 Image Error: {str(e)}")
+            
+            # If it fails, leave the original text intact
+            return original_text
+
+        # NEW REGEX: Safely target ONLY the "Click here..." sentence. 
+        # By removing re.DOTALL and <p> tags, the rest of the report is completely safe!
+        html_body = re.sub(
+            r'Click\s*<a[^>]+href="([^">]+storage\.googleapis\.com[^">]+)"[^>]*>.*?</a>[^<]*', 
+            fetch_link_and_convert_to_image, 
+            html_body, 
+            flags=re.IGNORECASE
+        )
+        # ================================================================
+        # ================================================================
 
         # === GET LOCAL SGT TIME ===
         sgt_timezone = timezone(timedelta(hours=8))
@@ -104,7 +121,7 @@ def export_to_pdf(report_markdown: str) -> str:
                 table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; table-layout: fixed; }}
                 th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; word-wrap: break-word; overflow-wrap: break-word; }}
                 th {{ background-color: #f2f2f2; color: #003366; font-weight: bold; }}
-                img {{ max-width: 450px; display: block; margin: 15px auto; }}
+                img {{ width: 600px; display: block; margin: 15px auto; }}
                 .footer-text {{ font-size: 9px; text-align: center; color: #777; }}
             </style>
         </head>

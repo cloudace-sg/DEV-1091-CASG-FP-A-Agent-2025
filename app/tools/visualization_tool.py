@@ -27,7 +27,7 @@ def upload_chart_to_gcs(buffer, filename_prefix="chart"):
     Uploads a PNG buffer to GCS and returns a short-lived Signed URL.
     Environment-Aware: Works locally (key.json) and in Production (ADC).
     """
-    # 1. Create a secure, unguessable filename using SGT (UTC+8)
+    # 1. Create secure, unguessable filename with SGT (UTC+8)
     sgt_timezone = datetime.timezone(datetime.timedelta(hours=8))
     timestamp = datetime.datetime.now(sgt_timezone).strftime("%Y%m%d_%H%M%S")
     unique_id = uuid.uuid4().hex[:8]
@@ -79,7 +79,7 @@ def generate_static_chart(df, chart_type, title="Financial Chart"):
     2. Breakdowns (Horizontal Bar)
     3. Comparisons (Grouped Vertical Bar)
     """
-    plt.figure(figsize=(10, 5)) 
+    plt.figure(figsize=(7, 3.5)) 
     sns.set_theme(style="whitegrid", font_scale=0.9)
     
     is_money = any(word in title.lower() for word in ['revenue', 'profit', 'cost', 'opex', 'sales', 'budget', 'payroll', 'labor', 'cogs', 'sg&a', 'overheads', 'facilities', 'utilities', 'rental', 'maintenance', 'advertising'])
@@ -178,7 +178,7 @@ def generate_static_chart(df, chart_type, title="Financial Chart"):
             df = pd.concat([top_df, other_row], ignore_index=True)
             
         # 3. Resize figure to be a perfect square for a circular pie
-        plt.gcf().set_size_inches(8, 8)
+        plt.gcf().set_size_inches(5, 5)
         
         # 4. Build Custom Labels (Name + Amount underneath)
         custom_labels = []
@@ -206,7 +206,7 @@ def generate_static_chart(df, chart_type, title="Financial Chart"):
     plt.tight_layout()
 
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=100)
+    plt.savefig(buf, format='png', dpi=150, bbox_inches='tight')
     buf.seek(0)
     plt.close()
 
@@ -408,13 +408,15 @@ def get_chart_data(metric_name: str, chart_type: str = "trend", period: str = No
         
         # return f"Chart Generated. Display this link exactly: \n\n![{metric_name} Chart]({chart_url})"
         # Force a clickable text link and prevent the LLM from rendering an image
+        '''
         return (
             f"✅ **Chart Generated Successfully!** \n\n"
             f"Here is your secure link to view the chart: **[📊 Click Here to View {metric_name} Chart]({chart_url})** \n\n"
             f"*(Note: For security, this link expires in 1 hour.)*\n\n"
             f"SYSTEM INSTRUCTION TO AGENT: You MUST present this exactly as a text link. DO NOT use the `![alt](url)` image markdown syntax."
         )
-
+        '''
+        return f"SUCCESS. The chart has been generated. RAW URL: {chart_url}"
 
     except Exception as e:
         return f"Error visualizing data: {str(e)}"
