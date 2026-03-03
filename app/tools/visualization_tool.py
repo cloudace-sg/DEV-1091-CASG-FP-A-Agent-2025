@@ -30,7 +30,7 @@ def upload_chart_to_gcs(buffer, filename_prefix="chart"):
     # 1. Create secure, unguessable filename with SGT (UTC+8)
     sgt_timezone = datetime.timezone(datetime.timedelta(hours=8))
     timestamp = datetime.datetime.now(sgt_timezone).strftime("%Y%m%d_%H%M%S")
-    unique_id = uuid.uuid4().hex[:8]
+    unique_id = uuid.uuid4().hex
     blob_name = f"charts/{filename_prefix}_{timestamp}_{unique_id}.png"
 
     storage_client = storage.Client()
@@ -38,31 +38,17 @@ def upload_chart_to_gcs(buffer, filename_prefix="chart"):
     blob = bucket.blob(blob_name)
     
     blob.upload_from_file(buffer, content_type='image/png')
+
+    # 2. RETURN CLEAN PROXY URL (NO SIGNATURES)
+    # Reconstruct the exact filename we just uploaded
+    filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
     
-    # 2. ENVIRONMENT-AWARE SIGNED URL
-    credentials, project_id = google.auth.default()
+    # CRITICAL: Replace this with your actual Cloud Run URL!
+    base_url = "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app" 
     
-    if not hasattr(credentials, 'signer'):
-        # Production Flow (Gemini Enterprise / Cloud Run)
-        request = google.auth.transport.requests.Request()
-        credentials.refresh(request)
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(hours=1),
-            method="GET",
-            service_account_email=credentials.service_account_email,
-            access_token=credentials.token    # <--- CRITICAL FIX FOR PRODUCTION
-        )
-    else:
-        # Local Flow (Cloud Shell with key.json)
-        url = blob.generate_signed_url(
-            version="v4",
-            expiration=datetime.timedelta(hours=1),
-            method="GET"
-        )
-    
-    return url
-    
+    clean_url = f"{base_url}/charts/{filename}"
+    return clean_url
+
 def smart_formatter(x, pos):
     """Dynamically chooses between Currency ($M/K) and Standard Number format."""
     if x >= 1e6:

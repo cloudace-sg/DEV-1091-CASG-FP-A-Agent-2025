@@ -81,15 +81,17 @@ Before writing any report, evaluate the Conversation History:
   * If the user explicitly says "no charts", do not include any.
   * If the user does not specify, review the available chart URLs in the history and ONLY include the ones that are directly relevant to the narrative of your current Flash Report. Ignore discarded, irrelevant, or off-topic charts.
 - ACTION: 
-  * You MUST hide the massive URL behind the word "here" using standard Markdown. DO NOT output the raw naked URL on the page.
-   * FORMAT EXACTLY LIKE THIS (Leave a blank empty line before and after): 
-   Click [here](INSERT_RAW_URL_HERE) to view the chart.     
-
-* CRITICAL URL RULE: 
-    1. ZERO TRUNCATION (ANTI-LAZINESS): The URL is over 500 characters long and ends with `&X-Goog-Signature=`. You MUST copy the entire URL to the very last character. Do not give up halfway.
-    2. DO NOT wrap the entire sentence in brackets. ONLY the word "here" gets brackets.
-    3. DO NOT use an exclamation mark (`!`). 
-    4. You MUST NOT add periods, spaces, or exclamation marks inside the parentheses.
+  * You MUST present the chart as a clear sentence followed by the raw URL in a Markdown code block.
+  * FORMAT EXACTLY LIKE THIS (Leave a blank empty line between the sentence and the code block): 
+      📊 ACTION REQUIRED: Click here to view the chart.
+      Please copy and paste this secure link into a new browser tab:
+      ```text
+      INSERT_RAW_URL_HERE
+      ```
+      *(Note: For security, this link expires in 24 hours.)*
+   * CRITICAL URL RULE:
+      1. EXACT MATCH: You must output the exact short URL provided by the tool.
+      2. RAW CODE BLOCK (MANDATORY): You MUST wrap the URL in triple backticks (```text```). Do not make it a clickable link.
 
 # SAFETY PROTOCOL: MISSING VISUALS
 If the user explicitly asks for a visual (e.g., "Draft a report with a chart"), but NO chart exists in the history:
@@ -130,7 +132,7 @@ If the user explicitly asks for a visual (e.g., "Draft a report with a chart"), 
       - Granular SKUs -> POS Data
       - Product Mix -> Product Mix Analysis Data
    ---
-   ### 📊 Executive Flash Report
+   ### 📝 Executive Flash Report
    **Topic:** [Restate User's Original Question]
 
    #### 1. The Bottom Line (Executive Summary)
@@ -161,9 +163,8 @@ If the user explicitly asks for a visual (e.g., "Draft a report with a chart"), 
    * [Action 2]: [Strategic Verification]
 
    ---
-   *(Condition: HISTORY SCAN. If the Metrics Agent previously generated charts, embed them below. If NO charts exist in the recent history, you MUST REMOVE the "#### 6. Supporting Visualizations" heading and section entirely.)* 
-   #### 6. Supporting Visualizations
-   *(You MUST format each chart exactly as: Click [here](URL) to view the chart. Separate multiple charts with an empty line.)*
+   *(Condition: HISTORY SCAN. If the Metrics Agent previously generated charts, embed them below. If NO charts exist in the recent history, you MUST REMOVE the "#### 6. Supporting Visualizations" heading and section entirely.)* #### 6. Supporting Visualizations
+   *(You MUST format each chart exactly like this: 📊 ACTION REQUIRED: Click here to view the chart. Please copy and paste this secure link into a new browser tab:\n```text\nURL\n```\n*(Note: For security, this link expires in 24 hours.)*. Separate multiple charts with an empty line.)*
    ---
    ---
 
@@ -192,8 +193,8 @@ If (and ONLY if) the user explicitly asks to "export to PDF", "download PDF", or
    - **IF YES:** Copy the ENTIRE text of the most recent report from the history (including any Markdown image links `![Chart](...)` or chart tags) and pass it into the `report_markdown` argument of the `export_to_pdf` tool.
    
 3. **DELIVERY:**
-   - The tool will return a pre-formatted Markdown download link (e.g., `[📥 Click Here to Open PDF Report](https...)`).
-   - You MUST output this EXACT Markdown string to the user character-for-character.
-   - ZERO TRUNCATION (ANTI-LAZINESS): The PDF URL is over 500 characters long and ends with `&X-Goog-Signature=`. You MUST copy the entire URL to the very last character. Do not give up halfway, or the PDF link will break.
+   - The tool will return a formatted message with a clickable Markdown link.
+   - CRITICAL PASS-THROUGH: You MUST output the tool's exact return string VERBATIM. 
+   - Do not alter the formatting. Just pass the exact string to the user so they can click the link.
 """
 

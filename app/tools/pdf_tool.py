@@ -16,7 +16,7 @@ BUCKET_NAME = "fpaa-reports"
 def export_to_pdf(report_markdown: str) -> str:
     """
     Converts a Markdown report to a PDF, pre-fetches any secure images, 
-    uploads it securely, and returns a 15-minute Signed URL.
+    uploads it securely, and returns a URL.
     Environment-Aware: Works locally (key.json) and in Production (ADC).
     """
     if not report_markdown or len(report_markdown.strip()) < 20:
@@ -33,59 +33,41 @@ def export_to_pdf(report_markdown: str) -> str:
         # 1. Convert Markdown to HTML
         html_body = markdown.markdown(report_markdown, extensions=['tables', 'fenced_code'])
 
-        '''
-        
-        # === PRE-FETCH & EMBED IMAGES ===
-        img_urls = re.findall(r'src="(https?://.*?)"', html_body)
-        for img_url in img_urls:
-            try:
-                # NEW FIX: Scrub HTML ampersands back to normal before downloading
-                clean_url = img_url.replace('&amp;', '&')
-                
-                # Fetch using the clean URL
-                img_response = requests.get(clean_url, timeout=10)
-                
-                if img_response.status_code == 200:
-                    b64_data = base64.b64encode(img_response.content).decode('utf-8')
-                    b64_src = f"data:image/png;base64,{b64_data}"
-                    # Replace using the original escaped URL so the HTML matches
-                    html_body = html_body.replace(img_url, b64_src)
-                else:
-                    print(f"[DEBUG] Google blocked the image download. Status: {img_response.status_code}")
-            except Exception as e:
-                print(f"[DEBUG] Failed to embed image in PDF: {e}")
-        # ================================
-        '''
-        # 1. Convert Markdown to HTML
-        html_body = markdown.markdown(report_markdown, extensions=['tables', 'fenced_code'])
-
         # === PRE-FETCH & EMBED IMAGES FROM HYPERLINKS (MAGIC PDF FIX) ===
         def fetch_link_and_convert_to_image(match):
             original_text = match.group(0)
-            
-            # Extract the URL and fix ampersands
             img_url = match.group(1).replace("&amp;", "&") 
             
-            if "storage.googleapis.com" in img_url:
+            # Look for our new clean Cloud Run proxy URL
+            if "/charts/" in img_url:
                 try:
-                    # Force Python to download the image
-                    response = requests.get(img_url, timeout=10)
-                    if response.status_code == 200:
-                        img_base64 = base64.b64encode(response.content).decode('utf-8')
-                        # MAGIC: Return ONLY the image. The "Click here..." text is safely destroyed!
-                        return f'<br><img src="data:image/png;base64,{img_base64}"><br>'
-                    else:
-                        print(f"[DEBUG] Google blocked the image download. Status: {response.status_code}")
+                    # =========================================================
+                    # FIX: The Python Air-Gap Bypass
+                    # Extract just the filename from the end of the URL
+                    # e.g., "budget_vs_actual_123.png"
+                    filename = img_url.split('/')[-1]
+                    blob_name = f"charts/{filename}"
+                    
+                    # Use Python SDK to download image natively from the private bucket
+                    storage_client = storage.Client()
+                    bucket = storage_client.bucket(BUCKET_NAME)
+                    blob = bucket.blob(blob_name)
+                    
+                    image_bytes = blob.download_as_bytes()
+                    img_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                    
+                    # Return ONLY the image to the PDF renderer. 
+                    return f'<br><img src="data:image/png;base64,{img_base64}"><br>'
+                        
                 except Exception as e:
-                    print(f"[DEBUG] Base64 Image Error: {str(e)}")
+                    print(f"[DEBUG] Base64 Image Bypass Error: {str(e)}")
             
             # If it fails, leave the original text intact
             return original_text
 
-        # NEW REGEX: Safely target ONLY the "Click here..." sentence. 
-        # By removing re.DOTALL and <p> tags, the rest of the report is completely safe!
+        # NEW REGEX: Safely target ONLY the "Click here..." sentence and grab the new short URL.
         html_body = re.sub(
-            r'Click\s*<a[^>]+href="([^">]+storage\.googleapis\.com[^">]+)"[^>]*>.*?</a>[^<]*', 
+            r'<p>[^<]*Click here[^<]*</p>\s*<pre><code[^>]*>\s*(https://[^\s<]+/charts/[^\s<]+)\s*</code></pre>', 
             fetch_link_and_convert_to_image, 
             html_body, 
             flags=re.IGNORECASE
@@ -147,40 +129,25 @@ def export_to_pdf(report_markdown: str) -> str:
         pdf_buffer.seek(0)
 
         # 4. Securely Upload to GCS
-        unique_id = uuid.uuid4().hex[:8]
-        # Use the SGT variable we created above for the filename
+        unique_id = uuid.uuid4().hex # <--- Use full UUID for maximum security
         timestamp = local_time_now.strftime("%Y%m%d_%H%M%S")
-        blob_name = f"pdfs/Financial_Report_{timestamp}_{unique_id}.pdf"
+        filename = f"Financial_Report_{timestamp}_{unique_id}.pdf"
+        blob_name = f"pdfs/{filename}"
 
         storage_client = storage.Client()
         bucket = storage_client.bucket(BUCKET_NAME)
         blob = bucket.blob(blob_name)
         blob.upload_from_file(pdf_buffer, content_type='application/pdf')
         
-        # 5. ENVIRONMENT-AWARE SIGNED URL
-        credentials, project_id = google.auth.default()
-        
-        if not hasattr(credentials, 'signer'):
-            # Production Flow (Uses IAM to sign on behalf of the service account)
-            request = google.auth.transport.requests.Request()
-            credentials.refresh(request)
-            url = blob.generate_signed_url(
-                version="v4",
-                expiration=timedelta(minutes=15),
-                method="GET",
-                service_account_email=credentials.service_account_email,
-                access_token=credentials.token   
-            )
-        else:
-            # Local Flow (Uses your key.json file automatically)
-            url = blob.generate_signed_url(
-                version="v4",
-                expiration=timedelta(minutes=15), 
-                method="GET"
-            )
+        # 5. RETURN CLEAN PROXY URL (NO SIGNATURES)
+        base_url = "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app" 
+        clean_url = f"{base_url}/pdfs/{filename}"
 
-        # <--- FIX 3: UX-friendly message with inline code backticks to protect the URL
-        return f"✅ **PDF Generated Successfully!** \n\n**[📥 Click Here to Open PDF Report]({url})** \n*(Note: For security, this link expires in 1 hour. Please download the report as soon as possible to save the report.)*"
-        
+        # We can finally use a beautiful, clickable Markdown link!
+        return (
+            f"✅ **PDF Generated Successfully!**\n\n"
+            f"**[📥 Click Here to Securely Download Your PDF Report]({clean_url})**\n\n"
+            f"*(Note: For security, this link expires in 24 hours.)*"
+        )
     except Exception as e:
         return f"Error generating PDF: {str(e)}"

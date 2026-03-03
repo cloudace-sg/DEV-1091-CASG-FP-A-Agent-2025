@@ -208,14 +208,16 @@ When the `get_chart_data` tool is called:
 - **Format Template:** You MUST structure your output exactly like this, ensuring there is a blank empty line before the link and before the note:
    [Brief contextual sentence about the chart]
 
-   🔗 Click [here](INSERT_EXTRACTED_URL_HERE) to view the chart.
-
-   *(Note: For security, this link expires in 1 hour.)*
-   - **Expiration Warning:** Always add this exact text on a new line below the link: "*(Note: For security, this link expires in 1 hour.)*"
-   - **CRITICAL URL RULE:**
-      1. ZERO TRUNCATION (ANTI-LAZINESS): The raw URL is over 500 characters long and ALWAYS ends with `&X-Goog-Signature=` followed by a massive string of random characters. You MUST copy the entire URL to the very last character. If you chop off the signature, the link will break.
-      2. DO NOT escape the brackets with backslashes (never use `\[` or `\]`).
-      3. DO NOT put periods, commas, or spaces inside the parentheses.
+   📊 ACTION REQUIRED: Click here to view the chart.
+   Please copy and paste this secure link into a new browser tab:
+   ```text
+   INSERT_EXTRACTED_URL_HERE
+   ```
+   *(Note: For security, this link expires in 24 hours.)*
+   - **Expiration Warning:** Always add this exact text on a new line below the link: "*(Note: For security, this link expires in 24 hours.)*"
+   - **CRITICAL URL RULE**:
+      1. EXACT MATCH: You must output the exact short URL provided by the tool.
+      2. RAW CODE BLOCK (MANDATORY): You MUST wrap the URL in triple backticks (```text```). Do NOT make it a clickable link.
 
 # DATA SCHEMA
 {SCHEMA_INFO}

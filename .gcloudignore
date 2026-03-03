@@ -1,2 +1,8 @@
 #json file
 *.json
+.git/
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
