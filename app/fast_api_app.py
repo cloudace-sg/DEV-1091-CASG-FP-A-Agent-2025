@@ -53,44 +53,30 @@ def extract_final_text(adk_response):
         logger.error(f"Extraction Error: {e}")
         return str(adk_response) # Fallback to raw dump if logic fails
 
-@app.get("/charts/{filename}")
-def stream_chart_to_browser(filename: str):
-    """
-    Acts as a secure proxy. Fetches the image from the private GCS bucket 
-    using Cloud Run's native Service Account and streams it to the browser.
-    """
+def _stream_gcs_file(filename: str, folder: str, media_type: str):
+    """Helper to stream a file from GCS as suggested by code review."""
+    BUCKET_NAME = "fpaa-reports"
     storage_client = storage.Client()
-    bucket = storage_client.bucket("fpaa-reports")
+    bucket = storage_client.bucket(BUCKET_NAME)
     
-    # We securely append the 'charts/' folder path on the backend
-    blob = bucket.blob(f"charts/{filename}")
+    # Securely build the path (e.g., charts/my_chart.png)
+    blob = bucket.blob(f"{folder}/{filename}")
     
     try:
-        # Download into memory and stream directly back to the user
-        image_bytes = blob.download_as_bytes()
-        return StreamingResponse(io.BytesIO(image_bytes), media_type="image/png")
+        file_bytes = blob.download_as_bytes()
+        return StreamingResponse(io.BytesIO(file_bytes), media_type=media_type)
     except Exception as e:
-        logger.error(f"Failed to fetch chart {filename}: {e}")
-        return {"error": "Chart not found or access denied."}
+        logger.error(f"Failed to fetch {folder}/{filename}: {e}")
+        # Return a generic error to the browser
+        return {"error": f"{folder.capitalize()[:-1]} not found or access denied."}
+
+@app.get("/charts/{filename}")
+def stream_chart_to_browser(filename: str):
+    return _stream_gcs_file(filename, "charts", "image/png")
 
 @app.get("/pdfs/{filename}")
 def stream_pdf_to_browser(filename: str):
-    """
-    Acts as a secure proxy. Fetches the PDF from the private GCS bucket 
-    using Cloud Run's native Service Account and streams it to the browser.
-    """
-    storage_client = storage.Client()
-    bucket = storage_client.bucket("fpaa-reports") # Uses your existing bucket name
-    
-    blob = bucket.blob(f"pdfs/{filename}")
-    
-    try:
-        # Download into memory and stream directly back as a PDF document
-        pdf_bytes = blob.download_as_bytes()
-        return StreamingResponse(io.BytesIO(pdf_bytes), media_type="application/pdf")
-    except Exception as e:
-        logger.error(f"Failed to fetch PDF {filename}: {e}")
-        return {"error": "PDF not found or access denied."}
+    return _stream_gcs_file(filename, "pdfs", "application/pdf")
         
 @app.post("/a2a/fpaa_orchestrator")
 async def gemini_translator(request: Request):

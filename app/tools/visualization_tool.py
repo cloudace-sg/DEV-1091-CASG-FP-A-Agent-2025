@@ -10,6 +10,7 @@ from google.cloud import storage, bigquery
 from matplotlib.ticker import FuncFormatter
 import google.auth
 import google.auth.transport.requests
+import os
 
 # CRITICAL: Use 'Agg' backend to prevent crashing on Cloud Run
 matplotlib.use('Agg')
@@ -44,7 +45,8 @@ def upload_chart_to_gcs(buffer, filename_prefix="chart"):
     filename = f"{filename_prefix}_{timestamp}_{unique_id}.png"
     
     # CRITICAL: Replace this with your actual Cloud Run URL!
-    base_url = "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app" 
+    # The 'SERVICE_BASE_URL' will be set in the Cloud Run Environment Variables
+    base_url = os.environ.get("SERVICE_BASE_URL", "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app")
     
     clean_url = f"{base_url}/charts/{filename}"
     return clean_url

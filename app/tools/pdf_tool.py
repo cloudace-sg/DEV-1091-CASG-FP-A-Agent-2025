@@ -9,6 +9,7 @@ from xhtml2pdf import pisa
 from google.cloud import storage
 import google.auth
 import google.auth.transport.requests
+import os
 
 # CONFIG
 BUCKET_NAME = "fpaa-reports"
@@ -140,7 +141,8 @@ def export_to_pdf(report_markdown: str) -> str:
         blob.upload_from_file(pdf_buffer, content_type='application/pdf')
         
         # 5. RETURN CLEAN PROXY URL (NO SIGNATURES)
-        base_url = "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app" 
+       # The 'SERVICE_BASE_URL' will be set in the Cloud Run Environment Variables
+        base_url = os.environ.get("SERVICE_BASE_URL", "https://fpaa-ge-backend-929980771057.asia-southeast1.run.app")
         clean_url = f"{base_url}/pdfs/{filename}"
 
         # We can finally use a beautiful, clickable Markdown link!
