@@ -13,7 +13,7 @@ from google.genai import types
 
 def load_csv_dataset():
     dataset = []
-    csv_file_path = "tests/integration/data/(Metrics Agent) DEV-1128 Test Case - SQL.csv"
+    csv_file_path = "tests/integration/data/(Metrics) DEV-1128 Test Case - SQL.csv"
     
     with open(csv_file_path, "r", encoding="utf-8-sig") as f:
         rows = list(csv.reader(f))

@@ -20,7 +20,7 @@ from google.genai import types
 def load_csv_dataset():
     dataset = []
     # ********change file path
-    csv_file_path = "tests/integration/data/(Investigation Agent) DEV-1129 Test Case - Tool Logic Case.csv"
+    csv_file_path = "tests/integration/data/(Investigation) DEV-1129 Test Case - Tool Logic Case.csv"
     
     with open(csv_file_path, "r", encoding="utf-8-sig") as f:
         rows = list(csv.reader(f))
