@@ -31,7 +31,7 @@ Filter: Finance_Line = 'COGS' AND Variance > 0.",analyze_variance_drivers (Expen
         GROUP BY Subtype
         ORDER BY ABS(Variance) DESC
         LIMIT 5",,,,,,,,,,
-TC-Dev-1129-003,Health Scan (General),Verify the proactive scanner finds top risks and performers.,"""How are we doing generally in Nov 2025?""","Logic: Trigger the scan_business_health tool (or run a variance query) to identify the best / worst performing locations.""
+TC-Dev-1129-003,Health Scan (General),Verify the proactive scanner finds top risks and performers.,"""What are the best and worst performing locations in Nov 2025, and what are their specific variance drivers?""","Logic: Trigger the scan_business_health tool (or run a variance query) to identify the best / worst performing locations.""
 
 SQL Target: fpaa_dataset.Budget_Variance_Detail
 
