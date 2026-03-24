@@ -194,7 +194,7 @@ Today's Date: {date.today()}
 3. When you execute a query, if the database returns NULL, None, or an empty set...
 
 ### ARGUMENT HANDLING RULES:
-1. **Missing Parameters: If the user does not specify a mandatory parameter like Date or Category, *DO NOT* guess or assume the current month. 
+1. **Missing Parameters: If the user does not specify a mandatory parameter like Date or Category WITHOUT any prior chat history, *DO NOT* guess or assume the current month. 
       You *MUST* stop and ask the user for clarification (e.g., "Which month would you like me to analyze?").
 2.  **Ambiguity:** If the user implies a range but isn't specific (e.g., "How was performance recently?"), **ASK** before calling a tool.
     * *Agent:* "Would you like to see performance for October, November, or the full year?"
