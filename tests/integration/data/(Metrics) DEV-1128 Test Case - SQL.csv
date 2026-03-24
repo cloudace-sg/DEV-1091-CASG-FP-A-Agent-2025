@@ -14,7 +14,7 @@ WHERE Month = '2025-11-01';
             SELECT SUM(Net_Profit) as val
             FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
             WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'",
-TC-Dev-1128-002,Location Filtering,Verify filtering by specific location dimension.,"""Show me the profit performance for the MCD_1 location for all available months.""","SELECT Location, Net_Profit
+TC-Dev-1128-002,Location Filtering,Verify filtering by specific location dimension.,"""Show me the profit performance for the MCD_1 location comparing Oct 2025 to Nov 2025.""","SELECT Location, Net_Profit
 FROM fpaa_dataset.Master_PnL_Summary 
 WHERE Location = 'MCD_1 
 ORDER BY Month;",query_bigquery,"[DEBUG] Running SQL: SELECT Month, Net_Profit FROM fpaa_dataset.Master_PnL_Summary WHERE Location = 'MCD_1' ORDER BY Month",

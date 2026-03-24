@@ -92,7 +92,7 @@ Step 3: Agent auto-calls analyze_variance_drivers to explain the increase.","1. 
         HAVING Curr <> Prev
         ORDER BY ABS(Curr - Prev) DESC
         LIMIT 5",,,,,,,,,,
-TC-Dev-1129-006,Phase 4 Fallback (Raw SQL),"Verify query_bigquery is used only for specific ID/SKU checks, not general math.","""Which specific transaction ID caused the maintenance spike in MCD_1?""","Agent uses its schema knowledge to identify that 'transaction_id' does not exist in the Expenses table. 
+TC-Dev-1129-006,Phase 4 Fallback (Raw SQL),"Verify query_bigquery is used only for specific ID/SKU checks, not general math.","""Which specific transaction ID caused the maintenance spike in MCD_1 for Nov 2025?""","Agent uses its schema knowledge to identify that 'transaction_id' does not exist in the Expenses table. 
 
 The agent may run a query to find the largest expenses, but it MUST inform the user that a specific 'transaction_id' is not available in the dataset.",N/A,N/A,,,,,,,,,,
 TC-Dev-1129-007,Multi-Step Drill Down,Verify the agent goes from Global -> Location -> Subtype (Root Cause).,"""Why is the Maintenance cost so high in Nov 2025?""","Step 1: Find Location (dimension='Location').
