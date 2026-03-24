@@ -76,8 +76,6 @@ def test_metrics_agent_execution(case):
 
     final_answer, full_trace = asyncio.run(_run())
 
-    # 👇 WE REMOVED THE PYTHON ASSERTION (Part 1). 
-    # We now let the LLM Judge decide if the tool used was "Good Enough."
 
     combined_output = f"[AGENT FINAL ANSWER]: {final_answer}\n\n[BACKEND TRACE]: {full_trace}"
     judge = ClaudeJudge()
