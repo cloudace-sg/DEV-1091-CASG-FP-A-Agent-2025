@@ -1,0 +1,197 @@
+Test Case ID,Test Type,Test Objective,User Input (Prompt),Expected Behaviour ,Tool,Actual Output (SQL),Pass/Fail,Note,,,,,,,,,,
+TC-Dev-1129-001,Revenue Logic (Special Case),Verify agent switches to MoM calculation (Product Mix) instead of Budget Variance for Revenue questions.,"""Why is Revenue higher in Nov 2025 compared to Oct 2025?""","Logic: Detects finance_line='Revenue'. Trigger _analyze_revenue_drivers.
+
+SQL Target: fpaa_dataset.Product_Mix_Analysis
+
+Calc: SUM(Nov) - SUM(Oct) grouped by Location.",analyze_variance_drivers (Revenue Path),"[DEBUG] _analyze_revenue_drivers SQL:
+
+        SELECT 
+            Location as Name,
+            SUM(CASE WHEN Month = '2025-11-01' THEN Revenue_Generated ELSE 0 END) as Curr,
+            SUM(CASE WHEN Month = '2025-10-01' THEN Revenue_Generated ELSE 0 END) as Prev
+        FROM `strong-kit-475107-k1.fpaa_dataset.Product_Mix_Analysis`
+        WHERE Month IN ('2025-11-01', '2025-10-01')
+        
+        GROUP BY 1
+        HAVING Curr <> Prev
+        ORDER BY ABS(Curr - Prev) DESC
+        LIMIT 5",Passed,,,,,,,,,,,
+TC-Dev-1129-002,Expense Logic (Standard),"Verify agent uses standard ""Actual vs Budget"" logic for expense lines like COGS.","""Why is COGS over budget in November 2025?""","Logic: Detects finance_line='COGS'. Trigger standard path.
+
+SQL Target: fpaa_dataset.Budget_Variance_Detail
+
+Filter: Finance_Line = 'COGS' AND Variance > 0.",analyze_variance_drivers (Expense Path),"[DEBUG] analyze_variance_drivers SQL:
+
+        SELECT 
+            Subtype, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'COGS' AND Location = 'MCD_1'
+        GROUP BY Subtype
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5",Passed,,,,,,,,,,,
+TC-Dev-1129-003,Health Scan (General),Verify the proactive scanner finds top risks and performers.,"""How are we doing generally in Nov 2025?""","Logic: Trigger the scan_business_health tool (or run a variance query) to identify the best / worst performing locations.""
+
+SQL Target: fpaa_dataset.Budget_Variance_Detail
+
+Sort: ORDER BY Variance DESC.",scan_business_health,"[DEBUG] scan_business_health SQL:
+
+        SELECT Location, SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+        WHERE Month = '2025-11-01'
+        GROUP BY Location
+        ORDER BY Variance DESC",Passed,,,,,,,,,,,
+TC-Dev-1129-004,Anomaly Detection (Story 4),Verify the agent uses the new Z-Score/Multiplier logic for spikes/errors.,"""Are there any huge data entry errors or spikes in Expenses for Nov 2025?""","Logic: Trigger detect_anomalies.
+
+SQL Target: fpaa_dataset.Expenses (Raw Table).
+
+Filter: Amount > (Average * 3).",detect_anomalies,"[DEBUG] detect_anomalies SQL:
+
+        WITH Stats AS (
+            SELECT finance_line_subtype as Cat, AVG(expense_amount) as AvgVal
+            FROM `strong-kit-475107-k1.fpaa_dataset.Expenses`
+            WHERE month_period = '2025-11-01'
+            GROUP BY 1
+        )
+        SELECT 
+            t.location, 
+            t.finance_line_subtype as Item, 
+            t.expense_amount as Amount, 
+            s.AvgVal
+        FROM `strong-kit-475107-k1.fpaa_dataset.Expenses` t
+        JOIN Stats s ON t.finance_line_subtype = s.Cat
+        WHERE t.month_period = '2025-11-01'
+        AND t.expense_amount > (s.AvgVal * 3) -- The ""3x"" Outlier Rule
+        ORDER BY t.expense_amount DESC
+        LIMIT 5
+    ",Passed,,,,,,,,,,,
+TC-Dev-1129-005,"The ""Trap"" (Verification)","Verify the agent detects a false premise (User asks why drop, but it rose) and continues investigation.","""Why did Total Revenue drop in Nov 2025?""","Step 1: compare_monthly_metric confirms Revenue Increased.
+
+Step 2: Agent corrects user (""Actually, it increased..."").
+
+Step 3: Agent auto-calls analyze_variance_drivers to explain the increase.","1. compare_monthly_metric
+
+2. analyze_variance_drivers","[DEBUG] compare_monthly_metric SQL:
+
+        SELECT Month, SUM(Revenue) as Value 
+        FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+        WHERE Month IN ('2025-11-01', '2025-10-01')
+        GROUP BY Month ORDER BY Month
+
+[DEBUG] _analyze_revenue_drivers SQL:
+
+        SELECT 
+            Location as Name,
+            SUM(CASE WHEN Month = '2025-11-01' THEN Revenue_Generated ELSE 0 END) as Curr,
+            SUM(CASE WHEN Month = '2025-10-01' THEN Revenue_Generated ELSE 0 END) as Prev
+        FROM `strong-kit-475107-k1.fpaa_dataset.Product_Mix_Analysis`
+        WHERE Month IN ('2025-11-01', '2025-10-01')
+        
+        GROUP BY 1
+        HAVING Curr <> Prev
+        ORDER BY ABS(Curr - Prev) DESC
+        LIMIT 5",Passed,,,,,,,,,,,
+TC-Dev-1129-006,Phase 4 Fallback (Raw SQL),"Verify query_bigquery is used only for specific ID/SKU checks, not general math.","""Which specific transaction ID caused the maintenance spike in MCD_1?""","Agent uses its schema knowledge to identify that 'transaction_id' does not exist in the Expenses table. 
+
+The agent may run a query to find the largest expenses, but it MUST inform the user that a specific 'transaction_id' is not available in the dataset.",N/A,N/A,Passed,No transaction ID provided as Expenses table does not contain transaction_id column,,,,,,,,,,
+TC-Dev-1129-007,Multi-Step Drill Down,Verify the agent goes from Global -> Location -> Subtype (Root Cause).,"""Why is the Maintenance cost so high in Nov 2025?""","Step 1: Find Location (dimension='Location').
+
+Step 2: Find Subtype (dimension='Subtype').
+",analyze_variance_drivers ,"[DEBUG] analyze_variance_drivers SQL:
+
+        SELECT 
+            Location, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'Facilities'
+        GROUP BY Location
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5",Passed,,,,,,,,,,,
+TC-Dev-1129-008,Orchestrator Routing,"Verify ""Why"" keyword forces Investigation Agent, even if ""Net Profit"" (Metric) is mentioned.","""What is the reason for the variance in Net Profit?""","Routing: Must go to investigation_agent, NOT metrics_agent.
+
+Step 1: Check if revenue dropped
+Step 2: Check if expenses rose
+Step 3: Deep Dive into finance line item causing the variance
+
+Logic: Drills down into Profit drivers (Revenue or Cost).","analyze_variance_drivers 
+(multiple calls)","[DEBUG] _analyze_revenue_drivers SQL:
+
+        SELECT 
+            Location as Name,
+            SUM(CASE WHEN Month = '2025-11-01' THEN Revenue_Generated ELSE 0 END) as Curr,
+            SUM(CASE WHEN Month = '2025-10-01' THEN Revenue_Generated ELSE 0 END) as Prev
+        FROM `strong-kit-475107-k1.fpaa_dataset.Product_Mix_Analysis`
+        WHERE Month IN ('2025-11-01', '2025-10-01')
+        
+        GROUP BY 1
+        HAVING Curr <> Prev
+        ORDER BY ABS(Curr - Prev) DESC
+        LIMIT 5
+
+[DEBUG] analyze_variance_drivers SQL:
+
+        SELECT 
+            Location, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'COGS'
+        GROUP BY Location
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5
+    
+[DEBUG] analyze_variance_drivers SQL:
+
+        SELECT 
+            Location, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'SG&A'
+        GROUP BY Location
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5
+
+... continued
+",Passed,,,,,,,,,,,
+TC-Dev-1129-009,Context Retention,"Verify Orchestrator injects the date from history so Sub-Agent doesn't ask ""Which month?"".","(Turn 1): ""Let's look at Nov 2025.""
+
+(Turn 2): ""Why is SG&A up?""","Orchestrator: Rewrites prompt to ""Why is SG&A up in Nov 2025?""
+
+Agent: Runs tool immediately without asking for date.",analyze_variance_drivers,"[DEBUG] analyze_variance_drivers SQL:
+
+        SELECT 
+            Location, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'SG&A'
+        GROUP BY Location
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5
+    ",Passed,,,,,,,,,,,
+TC-Dev-1129-010,Compound Intent,"Verify how the Orchestrator handles a ""What"" (Metric) AND ""Why"" (Investigation) request in one sentence.","""Compare Revenue vs last month AND explain why SG&A is up.""","Routing: sends directly to Investigation Agent, skips metrics agent.
+
+Step 1: compare_monthly_metric (Revenue).
+
+Step 2: analyze_variance_drivers (SG&A).","1. compare_monthly_metric
+
+2. analyze_variance_drivers","""[DEBUG] compare_monthly_metric SQL:
+
+        SELECT Month, SUM(Revenue) as Value 
+        FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+        WHERE Month IN ('2025-11-01', '2025-10-01')
+        GROUP BY Month ORDER BY Month
+   
+ [DEBUG] analyze_variance_drivers SQL:
+        SELECT 
+            Location, 
+            SUM(Actual_Amount) as Actual, 
+            SUM(Variance_Amount) as Variance
+        FROM `strong-kit-475107-k1.fpaa_dataset.Budget_Variance_Detail`
+         WHERE Month = '2025-11-01' AND Finance_Line = 'SG&A'
+        GROUP BY Location
+        ORDER BY ABS(Variance) DESC
+        LIMIT 5""",,,,,,,,,,,,No transaction ID provided as Expenses table does not contain transaction_id column

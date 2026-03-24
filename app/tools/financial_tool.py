@@ -12,7 +12,7 @@ LOCATION = "asia-southeast1"
 
 client = bigquery.Client(project=PROJECT_ID, location=LOCATION)
 
-def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_start_date: str = None) -> str:
+def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_start_date: str = None, location: str = None) -> str:
     """
     Calculates a specific P&L metric over a time period, optionally comparing it to a previous period.
     """
@@ -22,7 +22,7 @@ def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_star
     metric_map = {
         "Revenue": "Revenue",
         "Net_Profit": "Net_Profit",
-        "OPEX": "OPEX_Variance", 
+        "OPEX": "OPEX_Actual", 
     }
     
     db_column = metric_map.get(metric)
@@ -38,11 +38,14 @@ def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_star
 
     # 2. Helper to run a safe query
     def get_value(s_date, e_date):
-        # use the PROJECT_ID variable in the SQL string
+        # Create the location filter if the user provided one
+        loc_clause = f" AND LOWER(Location) = '{location.lower()}'" if location else ""
+        
+        # Inject it into the SQL string
         sql = f"""
             SELECT SUM({db_column}) as val
             FROM `{PROJECT_ID}.fpaa_dataset.Master_PnL_Summary`
-            WHERE Month BETWEEN '{s_date}' AND '{e_date}'
+            WHERE Month BETWEEN '{s_date}' AND '{e_date}'{loc_clause}
         """
         
         # --- DEBUG PRINT for SQL Statement ---
@@ -65,7 +68,7 @@ def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_star
 
     # 4. Handle Simple Request with start and end date
     if not compare_start_date:
-        return f"The total {metric} from {start_date} to {end_date} was ${current_val:,.2f}."
+        return f"The total {metric} from {start_date} to {end_date} was \${current_val:,.2f}."
 
     # 5. Handle Comparison Request
     fmt = "%Y-%m-%d"
@@ -91,34 +94,38 @@ def get_pnl_comparison(metric: str, start_date: str, end_date: str, compare_star
 
     # 7. Formatting
     direction = "up" if diff >= 0 else "down"
-    variance_str = f"${abs(diff):,.2f}"
+    variance_str = f"\${abs(diff):,.2f}"
     variance_sign = "+" if diff >= 0 else "-"
     
     return (
-        f"**{metric} Analysis**\n"
-        f"Current Period ({start_date} to {end_date}): ${current_val:,.2f}\n"
-        f"Prior Period   ({compare_start_date} to {compare_end_date}): ${previous_val:,.2f}\n"
-        f"Variance: {variance_sign}{variance_str} ({direction} {pct_change:.1f}%)"
+        f"\n\n**{metric} Analysis**\n\n"
+        f"- **Current Period** ({start_date} to {end_date}): \${current_val:,.2f}\n"
+        f"- **Prior Period** ({compare_start_date} to {compare_end_date}): \${previous_val:,.2f}\n"
+        f"- **Variance**: {variance_sign}{variance_str} ({direction} {pct_change:.1f}%)"
     )
 
     
 def analyze_gross_margin(target_month: str, comparison_month: str = None) -> str:
-    """Calculates Gross Margin (mapped to Net_Profit) with MoM comparison."""
-    sql = f"""
-        SELECT Month, SUM(Net_Profit) as GM_Value
-        FROM `{PROJECT_ID}.fpaa_dataset.Master_PnL_Summary`
-        WHERE Month = '{target_month}' 
-           OR Month = '{comparison_month}'
-        GROUP BY Month  -- <--- THIS WAS MISSING
-    """
+    """Calculates Gross Margin with MoM comparison."""
     
+    # NEW LOGIC: Only add comparison month if the user asked for it
+    where_clause = f"Month = '{target_month}'"
+    if comparison_month:
+        where_clause += f" OR Month = '{comparison_month}'"
+        
+    sql = f"""
+        SELECT Month, SUM(Gross_profit) as GM_Value
+        FROM `{PROJECT_ID}.fpaa_dataset.Master_PnL_Summary`
+        WHERE {where_clause}
+        GROUP BY Month 
+    """
     # --- DEBUG PRINT for SQL Statement ---
     print(f"\n[DEBUG] analyze_gross_margin SQL:\n{sql}\n")
     # ------------------------------
     try:
         query_job = client.query(sql, location=LOCATION)
-        # We need to format the date key as a string to match the input
-        results = {row.Month.strftime("%Y-%m-%d"): row.GM_Value for row in query_job.result()}
+        # FIX: Wrap row.GM_Value in float() to prevent the Decimal math crash
+        results = {row.Month.strftime("%Y-%m-%d"): float(row.GM_Value or 0.0) for row in query_job.result()}
     except Exception as e:
         return f"Error querying Gross Margin data: {str(e)}"
 
@@ -128,13 +135,18 @@ def analyze_gross_margin(target_month: str, comparison_month: str = None) -> str
     diff = current_gm - prior_gm
     pct = (diff / prior_gm * 100) if prior_gm != 0 else 0.0
     
-    return (
-        f"**Gross Margin Analysis (MoM)**\n"
-        f"Note: Based on dataset limitations, Gross Margin is derived from Net Profit.\n"
-        f"- **{target_month}**: ${current_gm:,.2f}\n"
-        f"- **{comparison_month}**: ${prior_gm:,.2f}\n"
-        f"- **Variance**: {'+' if diff >=0 else ''}${diff:,.2f} ({pct:+.1f}%)"
-    )
+    if comparison_month:
+        return (
+            f"\n\n**Gross Margin Analysis (MoM)**\n\n"
+            f"- **{target_month}**: \${current_gm:,.2f}\n"
+            f"- **{comparison_month}**: \${prior_gm:,.2f}\n"
+            f"- **Variance**: {'+' if diff >=0 else ''}\${diff:,.2f} ({pct:+.1f}%)"
+        )
+    else:
+        return (
+            f"\n\n**Gross Margin Analysis**\n\n"
+            f"- **{target_month}**: \${current_gm:,.2f}"
+        )
     
 
 def get_revenue_variance(start_date: str, end_date: str) -> str:
@@ -163,8 +175,8 @@ def get_revenue_variance(start_date: str, end_date: str) -> str:
     # 2. Return revenue variance analysis (Guardrailed to prevent hallucination)
     # does not return variance as dataset currently does not have total targets
     return (
-        f"**Revenue Variance Analysis ({start_date} to {end_date})**\n"
-        f"- **Actual Revenue**: ${actual_revenue:,.2f}\n"
+        f"\n\n**Revenue Variance Analysis ({start_date} to {end_date})**\n"
+        f"- **Actual Revenue**: \${actual_revenue:,.2f}\n"
         f"- **Budgeted Revenue**: N/A (Data Unavailable in Forecast Table)\n"
         f"- **Variance**: Cannot calculate %.\n\n"
         f"*System Note: The 'Forecast' table tracks Expenses only. Revenue targets are not currently loaded.*"
@@ -225,11 +237,11 @@ def get_budget_variance(month: str, finance_line: str = None, subtype: str = Non
         status = "Unfavorable (Over Budget)" if var > 0 else "Favorable (Under Budget)"
         
         return (
-            f"**Budget Variance Report ({month})**\n"
+            f"\n\n**Budget Variance Report ({month})**\n"
             f"- **Item**: {subtype or finance_line or 'Total Expenses'}\n"
-            f"- **Actual**: ${act:,.2f}\n"
-            f"- **Budget**: ${bud:,.2f}\n"
-            f"- **Variance**: ${abs(var):,.2f} {status}"
+            f"- **Actual**: \${act:,.2f}\n"
+            f"- **Budget**: \${bud:,.2f}\n"
+            f"- **Variance**: \${abs(var):,.2f} {status}"
         )
 
     except Exception as e:

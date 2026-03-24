@@ -1,0 +1,89 @@
+,,,,,,,,,
+Test Case ID,Test Type,Test Objective,User Input (Prompt),Expected Behaviour (SQL),Tool,Actual Output,Pass/Fail,To do in next task,Note
+TC-Dev-1128-001,High-Level Summary,Verify simple retrieval from the main P&L summary view.,"""What was the total Revenue and Net Profit in November 2025?""","SELECT SUM(Revenue), SUM(Net_Profit) 
+FROM fpaa_dataset.Master_PnL_Summary 
+WHERE Month = '2025-11-01'; 
+(Assuming Month is stored as start-of-month date)",get_pnl_comparison,"[DEBUG] get_pnl_comparison SQL:
+
+            SELECT SUM(Revenue) as val
+            FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+            WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'
+      
+[DEBUG] get_pnl_comparison SQL:
+
+            SELECT SUM(Net_Profit) as val
+            FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+            WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'",Pass ,,
+TC-Dev-1128-002,Location Filtering,Verify filtering by specific location dimension.,"""Show me the profit performance for the MCD_1 location for all available months.""","SELECT Location, Net_Profit
+FROM fpaa_dataset.Master_PnL_Summary 
+WHERE Location = 'MCD_1 
+ORDER BY Month;",query_bigquery,"[DEBUG] Running SQL: SELECT Month, Net_Profit FROM fpaa_dataset.Master_PnL_Summary WHERE Location = 'MCD_1' ORDER BY Month",Pass ,,
+TC-Dev-1128-003,Domain Mapping (Labour),"Verify agent maps ""Labour"" to 'Payroll' as per schema rules.","""Show me the budget variance for Labour costs.""","SELECT Month, Actual_Amount, Variance_Amount 
+FROM fpaa_dataset.Budget_Variance_Detail 
+WHERE Subtype = 'Payroll';",get_budget_variance,"[DEBUG] Running SQL: SELECT Month, SUM(Variance_Amount) AS Total_Labour_Variance FROM fpaa_dataset.Budget_Variance_Detail WHERE Subtype = 'Payroll' AND Month = '2025-11-01' GROUP BY Month",Pass ,,
+TC-Dev-1128-004,Product Drill-Down,Verify agent accesses the Product_Mix view for item-level details.,What were our top 3 best-selling products by total quantity in November 2025 by product description?,"SELECT product_description, SUM(Quantity_Sold) 
+FROM fpaa_dataset.Product_Mix_Analysis 
+WHERE Month = '2025-11-01' 
+GROUP BY product_description 
+ORDER BY 2 DESC LIMIT 3;",query_bigquery,"[DEBUG] Running SQL: SELECT product_description, SUM(Revenue_Generated) AS Total_Revenue FROM fpaa_dataset.Product_Mix_Analysis WHERE Month = '2025-11-01' AND product_description NOT LIKE '%Manual Adjustment%' GROUP BY product_description ORDER BY Total_Revenue DESC LIMIT 3",Pass ,,
+TC-Dev-1128-005,Category Summation,Verify aggregation of raw expenses if views don't cover it (or using detailed view).,"""How much did we spend on Utilities in total?""","SELECT SUM(Actual_Amount) 
+FROM fpaa_dataset.Budget_Variance_Detail 
+WHERE Subtype = 'Utilities';",get_budget_variance,[DEBUG] Running SQL: SELECT SUM(Actual_Amount) AS Total_Spend_on_Utilities FROM fpaa_dataset.Budget_Variance_Detail WHERE Subtype = 'Utilities',Pass ,,
+TC-Dev-1128-006,Multi-Dimensional,Verify filtering by both Location and Product.,"""How many apple pies did we sell in the MCD_1 branch?""","SELECT SUM(Quantity_Sold) 
+FROM fpaa_dataset.Product_Mix_Analysis 
+WHERE Location = 'MCD_1' 
+AND product_description LIKE '%Apple Pie%';",query_bigquery,[DEBUG] Running SQL: SELECT SUM(Quantity_Sold) AS Total_Apple_Pies_Sold FROM fpaa_dataset.Product_Mix_Analysis WHERE Location = 'MCD_1' AND product_description LIKE '%Apple Pie%',Pass ,,
+TC-Dev-1128-007,Day of Week Logic,Verify usage of Day_Name column in daily view.,"""Which day of the week usually has the highest revenue?""","SELECT Day_Name, SUM(Total_Revenue) 
+FROM fpaa_dataset.Daily_Sales_Performance 
+GROUP BY Day_Name 
+ORDER BY 2 DESC;",query_bigquery,"[DEBUG] Running SQL: SELECT Day_Name, SUM(Total_Revenue) AS Total_Revenue_Per_Day FROM fpaa_dataset.Daily_Sales_Performance GROUP BY Day_Name ORDER BY Total_Revenue_Per_Day DESC LIMIT 1",Pass ,,
+TC-Dev-1128-008,Raw Data Fallback,Verify agent falls back to POS table for transaction counts if needed (or checks specific skus).,"""What is the unit price for apple pie?""","SELECT unit_price 
+FROM fpaa_dataset.POS 
+WHERE product_sku LIKE '%Apple Pie%' LIMIT 1;",query_bigquery,[DEBUG] Running SQL: SELECT DISTINCT unit_price FROM fpaa_dataset.POS WHERE product_description LIKE '%Apple Pie%',Pass ,,
+TC-Dev-1128-009,Finance Hierarchy,Verify understanding of Finance Line vs Subtype.,"""Total maintenance costs for Facilities.""","SELECT SUM(Actual_Amount) 
+FROM fpaa_dataset.Budget_Variance_Detail 
+WHERE Finance_Line = 'Facilities' 
+AND Subtype = 'Maintenance';",get_budget_variance,[DEBUG] Running SQL: SELECT SUM(Actual_Amount) AS Total_Maintenance_Costs FROM fpaa_dataset.Budget_Variance_Detail WHERE Finance_Line = 'Facilities' AND Subtype = 'Maintenance',Pass ,,
+TC-Dev-1128-010,Zero/Null Handling,"Verify behavior when asking for missing data (e.g., September).","""Show me revenue for September 2028.""","SELECT SUM(Revenue) 
+FROM fpaa_dataset.Master_PnL_Summary 
+WHERE Month = '2025-09-01'; 
+(Should return 0 or null, confirming no hallucination)",get_pnl_comparison,"[DEBUG] get_pnl_comparison SQL:
+SELECT SUM(Revenue) as val
+FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+WHERE Month BETWEEN '2028-09-01' AND '2028-09-30'",Pass ,,
+TC-Dev-1128-011,Out of Scope (Missing Metric),Verify agent identifies metrics that cannot be calculated from the schema.,"""What is our current Customer Churn Rate?""","None / No SQL Generated. ""Metric not found in financial data stores; unable to calculate.""",None,Metric not found in financial data stores; unable to calculate.,Pass ,,
+TC-Dev-1128-012,Single-View Aggregation,Verifies agent aggregates Net Profit from the Master P&L Summary to answer margin/profitability questions.,"""What is the Gross margin for November against the previous month""","SELECT Month, SUM(Net_Profit) 
+FROM fpaa_dataset.Master_PnL_Summary
+WHERE Month = '2025-11-01'
+OR Month = '2025-10-01'
+GROUP BY Month",analyze_gross_margin,"[DEBUG] analyze_gross_margin SQL:
+SELECT Month, SUM(Net_Profit) as GM_Value
+FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+WHERE Month = '2025-11-01'
+OR Month = '2025-10-01'
+GROUP BY Month",Pass ,,
+TC-Dev-1128-013,Partial Data Retrieval,"Verifies agent retrieves ""Actuals"" (Revenue) correctly even when ""Forecast"" targets are documented as unavailable.","""What is the revenue variance for November?""","SELECT SUM(Revenue)
+FROM fpaa_dataset.Master_PnL_Summary
+WHERE Month = '2025-11-01' ",get_revenue_variance,"[DEBUG] get_revenue_variance SQL:
+SELECT SUM(Revenue) as Total_Revenue
+FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'",Pass ,,System Note: The 'Forecast' table tracks Expenses only. Revenue targets are not currently loaded.
+TC-Dev-1128-014,Deterministic Accuracy,"Verifies agent is able to retrieve values from Master P&L Summary and round off to 2 decimal places, based on tool calculations.
+Must display SQL query run with no hallucinations
+",Calculate the variance % between 'Actuals' and 'Budget' for Nov 2025 Revenue.,"SELECT SUM(Revenue) 
+FROM fpaa_dataset.Master_PnL_Summary
+WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'",get_revenue_variance,"[DEBUG] get_revenue_variance SQL:
+        SELECT SUM(Revenue) as Total_Revenue 
+        FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary` 
+        WHERE Month BETWEEN '2025-11-01' AND '2025-11-30'",Pass ,,System Note: The 'Forecast' table tracks Expenses only. Revenue targets are not currently loaded.
+TC-Dev-1128-015,Comparison across time,Verifies agent is able to correctly identify the 'Current Month' and 'Previous Month' dates and returns a delta value.,Compare MoM (Month-over-Month) Gross Margin for the sales data.,"SELECT Month, SUM(Net_Profit) 
+FROM fpaa_dataset.Master_PnL_Summary
+WHERE Month = '2025-11-01'
+OR Month = '2025-10-01'
+GROUP BY Month",analyze_gross_margin,"[DEBUG] analyze_gross_margin SQL:
+SELECT Month, SUM(Net_Profit) as GM_Value
+FROM `strong-kit-475107-k1.fpaa_dataset.Master_PnL_Summary`
+WHERE Month = '2025-11-01'
+OR Month = '2025-10-01'
+GROUP BY Month",Pass ,,
+TC-Dev-1128-016,Zero-Hallucination Guardrails,Verifies that agent is able to handle when user requests a metric that does not exist in the BQ views or cannot be calculated ,What is the customer satisfaction score for Nov 2025?,Metric not found in financial data stores; unable to calculate.,None,Metric not found in financial data stores; unable to calculate.,Pass ,,

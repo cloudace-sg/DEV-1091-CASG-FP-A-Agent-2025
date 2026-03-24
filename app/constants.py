@@ -9,22 +9,22 @@ SCHEMA_INFO = """
 
 1. VIEW: `fpaa_dataset.Master_PnL_Summary`
    - Use for: Executive summaries of Profit, Revenue, and Cost performance.
-   - Columns: Month, Location, Revenue, Net_Profit, COGS_Variance, OPEX_Variance
+   - Columns: Month, Location, Revenue, COGS_Actual, OPEX_Actual, Gross_profit, Operating_Profit, Net_Profit, COGS_Variance, OPEX_Variance
 
 2. VIEW: `fpaa_dataset.Budget_Variance_Detail`
    - Use for: Investigating specific variances against the plan.
-   - Columns: Month, Location, Finance_Line, Subtype, Actual_Amount, Variance_Amount
+   - Columns: Month, Location, Finance_Line, Subtype, Actual_Amount, Forecast_Amount, Variance_Amount, Variance_Percent
    - Key Mapping for 'Subtype' Column:
      * "Labour" -> query as 'Payroll'
      * "Maintenance", "Print Advertising", "Renovation", "Rental", "Kitchen tools", "Utilities"
 
 3. VIEW: `fpaa_dataset.Product_Mix_Analysis`
    - Use for: Understanding sales drivers by product.
-   - Columns: Month, Location, product_description, Quantity_Sold, Revenue_Generated
+   - Columns: Month, Location, product_sku, product_description, Quantity_Sold, Revenue_Generated, Menu_price, Avg_Effective_Price
 
 4. VIEW: `fpaa_dataset.Daily_Sales_Performance`
    - Use for: Checking daily trends.
-   - Columns: Sales_Date, Day_Name, Location, Total_Revenue, Transaction_Count
+   - Columns: Sales_Date, Day_Name, Location, Total_Revenue, Transaction_Count, Items_sold, Total_Discounts, Avg_ticket_size, units_per_transaction
 
 --- RAW TABLES (USE ONLY IF VIEWS FAIL) ---
 
@@ -73,8 +73,16 @@ Use this to identify Finance Lines vs Subtypes.
 # ONLY give this to the Metrics Agent.
 METRICS_SQL_LOGIC = """
 --- CALCULATION RULES (For SQL Fallback) ---
-- **Gross Margin**: There is no 'Gross_Margin' column. You MUST calculate it as: `(Revenue - Cost)`.
 - **Month-over-Month (MoM)**: When writing SQL, use `LAG()` window functions to compare rows.
+- **Contribution Margin (CM%)**: 
+  1. Do NOT run multiple queries. You MUST calculate it using a single JOIN query.
+     *Example Structure:* `SELECT pnl.Revenue, cost.Actual_Amount as Product_Cost, ((pnl.Revenue - cost.Actual_Amount) / pnl.Revenue) * 100 as CM_Pct FROM fpaa_dataset.Master_PnL_Summary pnl JOIN fpaa_dataset.Budget_Variance_Detail cost ON pnl.Month = cost.Month AND pnl.Location = cost.Location WHERE LOWER(cost.Subtype) = 'product cost'`
+  2. You MUST format the final output as a clean, bulleted list showing the math. 
+     *Format Template:*
+     - **Total Revenue**: \$[Amount]
+     - **Product Cost**: \$[Amount]
+     - **Contribution Margin (CM%)**: [Percentage]%
+
 """
 
 # ==============================================================================

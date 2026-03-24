@@ -2,7 +2,7 @@
 .deepeval/.deepeval_telemetry.txt
 
 # testing data
-/tests/integration/data
+#/tests/integration/data
 
 #json file
 *.json

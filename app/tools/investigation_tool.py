@@ -200,7 +200,7 @@ def compare_monthly_metric(current_month: str, previous_month: str, metric_name:
         direction = "INCREASED" if delta > 0 else "DECREASED"
         
         return (
-            f"**{metric_name} MoM Comparison:**\n"
+            f"\n\n**{metric_name} MoM Comparison:**\n"
             f"- {prev_row.Month}: ${prev_val:,.0f}\n"
             f"- {curr_row.Month}: ${curr_val:,.0f}\n"
             f"- Result: {direction} by ${abs(delta):,.0f} ({pct_change:.1f}%)\n\n"
