@@ -3,12 +3,10 @@ name: DeepEval Automated Tests
 on:
   push:
     branches:
-      - main
-      - feature/fpaa-agent-engine
+      - staging
   pull_request:
     branches:
-      - main
-      - feature/fpaa-agent-engine
+      - staging
 
 jobs:
   run-evaluations:
