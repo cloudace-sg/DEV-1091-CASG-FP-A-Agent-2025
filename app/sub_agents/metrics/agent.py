@@ -10,6 +10,7 @@ from app.tools.financial_tool import (
     get_budget_variance
 )
 from app.tools.visualization_tool import get_chart_data
+from app.tools.deadmetric_tool import get_missing_metric_link
 from .prompts import METRICS_AGENT_PROMPT
 
 # --- define call_metrics_agent
@@ -22,7 +23,8 @@ metrics_agent = LlmAgent(
         analyze_gross_margin,
         get_revenue_variance,
         get_budget_variance,
-        get_chart_data
+        get_chart_data,
+        get_missing_metric_link
     ],
     model="gemini-2.5-flash"
 )

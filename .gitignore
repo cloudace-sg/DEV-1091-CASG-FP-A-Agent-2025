@@ -1,5 +1,12 @@
+# DeepEval telemetry and logs
+.deepeval/.deepeval_telemetry.txt
+
+# testing data
+#/tests/integration/data
+
 #json file
 *.json
+
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -119,6 +126,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+# Environment Variables / Secrets
+.env
+.env.*
 
 # Spyder project settings
 .spyderproject

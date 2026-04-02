@@ -24,7 +24,9 @@ dependencies = [
     "seaborn>=0.13.2",
     "markdown",
     "xhtml2pdf",
-    "google-cloud-storage"
+    "google-cloud-storage",
+    "deepeval>=3.8.9",
+    "anthropic>=0.84.0",
 ]
 requires-python = ">=3.10,<3.14"
 

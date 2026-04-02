@@ -125,7 +125,7 @@ If the user explicitly asks for a visual (e.g., "Draft a report with a chart"), 
 - **Trigger:** If the user explicitly asks for a "Report", "Summary", or "Executive Brief".
 - **Action:** You MUST output the report in this EXACT Markdown format:
    **DATA SOURCING RULE (CRITICAL):**
-      In the "Source" column of your tables, NEVER use tool names. You must translate the source to the actual business database table using this mapping:
+      In the "Source" column of your tables, NEVER use tool names or underscores. You must translate the source to clean, readable text using this exact mapping:
       - High-level P&L / Revenue / Net Profit -> Master PnL Summary Data
       - Budget vs Actual / Variances -> Budget Variance Detail Data
       - Daily Sales / Store Metrics -> Daily Sales Performance Data
